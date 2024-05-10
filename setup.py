@@ -69,6 +69,8 @@ _deps = [
     "trl>=0.8.2",
     "jinja2>=3.0.0",
     "tqdm>=4.64.1",
+    # iterative dpo
+    "vllm"
 ]
 
 # this is a lookup table with items like:
