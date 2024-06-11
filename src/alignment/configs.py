@@ -409,3 +409,25 @@ class CandidateArguments:
           "help": "Top-p for generation."
       },
     )
+    
+
+@dataclass
+class RankingArguments:
+    rank_model_name_or_path: str = field(
+        default=None,
+        metadata={
+            "help": "Huggingface model name or path to model directory, for the model that will be used for generation, defaults to SFT model or previous iteration model."
+        },
+    )
+    input_rank_dataset_path: str = field(
+        default=None,
+        metadata={
+            "help": "Path to the input dataset, that will be used to generate candidates, defaults to previous iteration output dataset."
+        },
+    )
+    output_rank_dataset_path: str = field(
+        default=None,
+        metadata={
+            "help": "Path to the output dataset, where the generated candidates will be saved."
+        },
+    )

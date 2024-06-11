@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import List, Optional, Sequence, cast
 from alignment.utils import execute_cli_script
-from alignment.configs import CandidateArguments
+from alignment.configs import CandidateArguments, RankingArguments
 from trl import TrlParser
 from datasets import load_dataset
 # get current abolute path of the file but without the file
@@ -60,11 +60,12 @@ class IterativeDpoArguments:
     
     
 def main():
-  parser = TrlParser((IterativeDpoArguments, CandidateArguments))
-  dpo_args, candidate_args = parser.parse_args_and_config()
+  parser = TrlParser((IterativeDpoArguments, CandidateArguments,RankingArguments))
+  dpo_args, candidate_args,ranking_args = parser.parse_args_and_config()
   print(dpo_args,candidate_args)
   dpo_args = cast(IterativeDpoArguments, dpo_args)
   candidate_args = cast(CandidateArguments, candidate_args)
+  ranking_args = cast(RankingArguments, ranking_args)
 
   ########################################
   # Load Dataset & create iteration splits
@@ -125,6 +126,23 @@ def main():
       os.path.join(absoulte_path,"run_generate_candidates.py"),
       asdict(per_iteration_candiate_args)
     )
+    
+    ########################
+    # 2. Rank Candidates
+    ########################
+    print("Ranking Candidates")
+    candidates_dataset_path = os.path.join(iteration_dir, "candidates.json")
+    per_iteration_ranking_args = RankingArguments(
+      rank_model_name_or_path=ranking_args.rank_model_name_or_path,
+      input_rank_dataset_path=candidates_dataset_path,
+      output_rank_dataset_path=iteration_dir
+    )
+    # rank candidates
+    execute_cli_script(
+      os.path.join(absoulte_path,"run_rank_candidates.py"),
+      asdict(per_iteration_ranking_args)
+    )
+    raise ValueError("Stop")
 
 
 if __name__ == "__main__":

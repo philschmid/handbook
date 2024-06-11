@@ -92,8 +92,6 @@ def main():
 
     # Create output dir
     Path(script_args.output_dataset_path).mkdir(parents=True, exist_ok=True)
-    logging.info(f"Saving candidates to {script_args.output_dataset_path}")
-    print(f"Saving candidates to {script_args.output_dataset_path}")
 
     # load dataset and tokenizer
     if script_args.input_dataset_path.endswith(".json"):
