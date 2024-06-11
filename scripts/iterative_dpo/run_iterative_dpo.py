@@ -89,7 +89,7 @@ def main():
   # Start Iterative DPO Loop 
   ###########################
   # 1. Generate Candidates
-  # 2. Rank Candidates
+  # 2. Rank Candidates 
   # 3. Generate comparison dataset
   # 4. Train model with DPO 
   # 5. save DPO model and start next iteration
@@ -127,9 +127,9 @@ def main():
       asdict(per_iteration_candiate_args)
     )
     
-    ########################
-    # 2. Rank Candidates
-    ########################
+    ######################################################
+    # 2. Rank Candidates & 3. Generate comparison dataset
+    ######################################################
     print("Ranking Candidates")
     candidates_dataset_path = os.path.join(iteration_dir, "candidates.json")
     per_iteration_ranking_args = RankingArguments(
@@ -142,7 +142,17 @@ def main():
       os.path.join(absoulte_path,"run_rank_candidates.py"),
       asdict(per_iteration_ranking_args)
     )
-    raise ValueError("Stop")
+    
+    #########################
+    # 4. Train model with DPO
+    #########################
+    print("Training DPO Model")
+    # rank candidates
+    execute_cli_script(
+      os.path.join(absoulte_path,"..","run_dpo.py"),
+      asdict(per_iteration_ranking_args)
+    )
+
 
 
 if __name__ == "__main__":
