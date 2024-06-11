@@ -14,8 +14,8 @@ from transformers import pipeline
 
 # python scripts/iterative_dpo/run_rank_candidates.py \
 # --rank_model_name_or_path sfairXC/FsfairX-LLaMA3-RM-v0.1 \
-# --input_dataset_path test/iterative_dpo/iteration_0/candidates.json \
-# --output_dataset_path test/iterative_dpo/iteration_0
+# --input_rank_dataset_path test/iterative_dpo/iteration_0/candidates.json \
+# --output_rank_dataset_path test/iterative_dpo/iteration_0
 
 def create_pairwise_dataset(dataset: Dataset) -> Dataset:
     def create_pair(s):
@@ -89,7 +89,7 @@ def main():
     Path(script_args.output_rank_dataset_path).mkdir(parents=True, exist_ok=True)
 
     # load dataset and tokenizer
-    if script_args.input_dataset_path.endswith(".json"):
+    if script_args.input_rank_dataset_path.endswith(".json"):
         dataset = load_dataset(
             "json", data_files=script_args.input_rank_dataset_path, split="train"
         )
