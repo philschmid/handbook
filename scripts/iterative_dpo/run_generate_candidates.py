@@ -1,5 +1,6 @@
+import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence, cast
 
@@ -10,22 +11,15 @@ from transformers import AutoTokenizer
 from trl import TrlParser
 from vllm import LLM, SamplingParams
 from datasets import Dataset
+from alignment.configs import CandidateArguments
 
 
-# python /fsx/philipp/alignment-handbook/scripts/run_generate_candidates.py --model_name_or_path alignment-handbook/zephyr-7b-sft-full --dataset_path philschmid/dolly-15k-oai-style --output_dir /fsx/philipp/alignment-handbook --batch_size 8
+# python scripts/iterative_dpo/run_generate_candidates.py \
+# --generation_model_name_or_path TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+# --input_dataset_path test/iterative_dpo/iteration_0/prompts.json \
+# --output_dataset_path test/iterative_dpo/iteration_0
 
 
-@dataclass
-class ScriptArguments:
-    model_name_or_path: str
-    dataset_path: str
-    output_dir: str
-    num_samples: int = 5
-    batch_size: int = 1
-    max_new_tokens: int = 2048
-    temperature: float = 0.7
-    top_k: int = -1
-    top_p: float = 1.0
 
 
 def validate_dataset(dataset):
@@ -61,6 +55,9 @@ def vllm_create_candidates(
         }
     )
 
+    # print the first prompt
+    print("First prompt:", dataset["prompt"][0])
+
     sampling_params = SamplingParams(
         max_tokens=max_new_tokens,
         n=num_samples,
@@ -89,30 +86,35 @@ def vllm_create_candidates(
 
 
 def main():
-    parser = TrlParser((ScriptArguments))
+    parser = TrlParser((CandidateArguments))
     script_args = parser.parse_args_and_config()[0]
-    script_args = cast(ScriptArguments, script_args)
+    script_args = cast(CandidateArguments, script_args)
 
     # Create output dir
-    Path(script_args.output_dir).mkdir(parents=True, exist_ok=True)
+    Path(script_args.output_dataset_path).mkdir(parents=True, exist_ok=True)
+    logging.info(f"Saving candidates to {script_args.output_dataset_path}")
+    print(f"Saving candidates to {script_args.output_dataset_path}")
 
     # load dataset and tokenizer
-    if script_args.dataset_path.endswith(".json"):
+    if script_args.input_dataset_path.endswith(".json"):
         dataset = load_dataset(
-            "json", data_files=script_args.dataset_path, split="train"
+            "json", data_files=script_args.input_dataset_path, split="train"
         )
     else:
-        dataset = load_dataset(script_args.dataset_path, split="train")
+        dataset = load_dataset(script_args.input_dataset_path, split="train")
+        
+    # rename the message column to "messages"
+    if script_args.messages_column != "messages":
+        dataset = dataset.rename_column(script_args.messages_column, "messages")
+    # validate dataset format and that the last message is the assistant message
     validate_dataset(dataset)
-    dataset = dataset.shuffle().select(range(2000))
-
     print(
         f"Generating {script_args.num_samples} candidates for {len(dataset)} prompts..."
     )
     start_time = time.time()
     candidates_ds = vllm_create_candidates(
         dataset,
-        model_name_or_path=script_args.model_name_or_path,
+        model_name_or_path=script_args.generation_model_name_or_path,
         num_samples=script_args.num_samples,
         max_new_tokens=script_args.max_new_tokens,
         batch_size=script_args.batch_size,
@@ -123,7 +125,7 @@ def main():
     print(
         f"Generated {len(dataset) * script_args.num_samples} completions in {time.time() - start_time:.2f} seconds."
     )
-    candidates_ds.to_json(f"{script_args.output_dir}/candidates.json")
+    candidates_ds.to_json(f"{script_args.output_dataset_path}/candidates.json")
 
 
 if __name__ == "__main__":

@@ -116,6 +116,7 @@ install_requires = [
     deps["tqdm"],  # progress bars in model download and training scripts
     deps["transformers"],
     deps["trl"],
+    deps["vllm"],
 ]
 
 setup(

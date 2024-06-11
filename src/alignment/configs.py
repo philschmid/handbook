@@ -343,3 +343,69 @@ class ORPOConfig(transformers.TrainingArguments):
         default=None,
         metadata={"help": ("The number of workers to use to tokenize the data.")},
     )
+
+
+
+
+@dataclass
+class CandidateArguments:
+    generation_model_name_or_path: str = field(
+        default=None,
+        metadata={
+            "help": "Huggingface model name or path to model directory, for the model that will be used for generation, defaults to SFT model or previous iteration model."
+        },
+    )
+    input_dataset_path: str = field(
+        default=None,
+        metadata={
+            "help": "Path to the input dataset, that will be used to generate candidates, defaults to previous iteration output dataset."
+        },
+    )
+    output_dataset_path: str = field(
+        default=None,
+        metadata={
+            "help": "Path to the output dataset, where the generated candidates will be saved."
+        },
+    )
+    messages_column: str = field(
+        default="chosen",
+        metadata={
+            "help": "Column name in the input dataset that contains the messages."
+        },
+    )
+    num_samples: int = field(
+      default=5,
+      metadata={
+          "help": "Number of samples to generate for each input."
+      },
+    )
+    batch_size: int = field(
+      default=1,
+      metadata={
+          "help": "Batch size for generation."
+      },
+    )
+    max_new_tokens: int = field(
+      default=2048,
+      metadata={
+          "help": "Maximum number of new tokens to generate."
+      },
+    )
+    temperature: float = field(
+      default=0.7,
+      metadata={
+          "help": "Temperature for generation."
+      },
+    )
+    top_k: int = field(
+      default=-1,
+      metadata={
+          "help": "Top-k for generation."
+      },
+    )
+    top_p: float = field(
+      default=1.0,
+      metadata={
+          "help": "Top-p for generation."
+      },
+    )
