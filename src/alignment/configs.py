@@ -30,7 +30,9 @@ DataClassType = NewType("DataClassType", Any)
 
 
 class H4ArgumentParser(HfArgumentParser):
-    def parse_yaml_and_args(self, yaml_arg: str, other_args: Optional[List[str]] = None) -> List[dataclass]:
+    def parse_yaml_and_args(
+        self, yaml_arg: str, other_args: Optional[List[str]] = None
+    ) -> List[dataclass]:
         """
         Parse a YAML file and overwrite the default/loaded values with the values provided to the command line.
 
@@ -47,7 +49,9 @@ class H4ArgumentParser(HfArgumentParser):
 
         outputs = []
         # strip other args list into dict of key-value pairs
-        other_args = {arg.split("=")[0].strip("-"): arg.split("=")[1] for arg in other_args}
+        other_args = {
+            arg.split("=")[0].strip("-"): arg.split("=")[1] for arg in other_args
+        }
         used_args = {}
 
         # overwrite the default/loaded value with the value provided to the command line
@@ -80,7 +84,9 @@ class H4ArgumentParser(HfArgumentParser):
                     if arg not in used_args:
                         used_args[arg] = val
                     else:
-                        raise ValueError(f"Duplicate argument provided: {arg}, may cause unexpected behavior")
+                        raise ValueError(
+                            f"Duplicate argument provided: {arg}, may cause unexpected behavior"
+                        )
 
             obj = data_class(**inputs)
             outputs.append(obj)
@@ -94,7 +100,9 @@ class H4ArgumentParser(HfArgumentParser):
             output = self.parse_yaml_file(os.path.abspath(sys.argv[1]))
         # parse command line args and yaml file
         elif len(sys.argv) > 2 and sys.argv[1].endswith(".yaml"):
-            output = self.parse_yaml_and_args(os.path.abspath(sys.argv[1]), sys.argv[2:])
+            output = self.parse_yaml_and_args(
+                os.path.abspath(sys.argv[1]), sys.argv[2:]
+            )
         # parse command line args only
         else:
             output = self.parse_args_into_dataclasses()
@@ -112,7 +120,11 @@ class ModelArguments:
 
     base_model_revision: Optional[str] = field(
         default=None,
-        metadata={"help": ("The base model checkpoint for weights initialization with PEFT adapters.")},
+        metadata={
+            "help": (
+                "The base model checkpoint for weights initialization with PEFT adapters."
+            )
+        },
     )
     model_name_or_path: Optional[str] = field(
         default=None,
@@ -124,9 +136,13 @@ class ModelArguments:
     )
     model_revision: str = field(
         default="main",
-        metadata={"help": "The specific model version to use (can be a branch name, tag name or commit id)."},
+        metadata={
+            "help": "The specific model version to use (can be a branch name, tag name or commit id)."
+        },
     )
-    model_code_revision: str = field(default=None, metadata={"help": "The branch of the IFT model"})
+    model_code_revision: str = field(
+        default=None, metadata={"help": "The branch of the IFT model"}
+    )
     torch_dtype: Optional[str] = field(
         default=None,
         metadata={
@@ -145,7 +161,9 @@ class ModelArguments:
             )
         },
     )
-    trust_remote_code: bool = field(default=False, metadata={"help": "Trust remote code when loading a model."})
+    trust_remote_code: bool = field(
+        default=False, metadata={"help": "Trust remote code when loading a model."}
+    )
     use_flash_attention_2: bool = field(
         default=False,
         metadata={
@@ -184,9 +202,12 @@ class ModelArguments:
     bnb_4bit_quant_type: Optional[str] = field(
         default="nf4", metadata={"help": "precise the quantization type (fp4 or nf4)"}
     )
-    use_bnb_nested_quant: bool = field(default=False, metadata={"help": "use nested quantization"})
+    use_bnb_nested_quant: bool = field(
+        default=False, metadata={"help": "use nested quantization"}
+    )
     bnb_4bit_quant_storage: Optional[str] = field(
-        default="uint8", metadata={"help": "storage type to pack the quanitzed 4-bit prarams."}
+        default="uint8",
+        metadata={"help": "storage type to pack the quanitzed 4-bit prarams."},
     )
 
     def __post_init__(self):
@@ -200,14 +221,20 @@ class DataArguments:
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
 
-    chat_template: Optional[str] = field(default=None, metadata={"help": "The chat template to use."})
+    chat_template: Optional[str] = field(
+        default=None, metadata={"help": "The chat template to use."}
+    )
     dataset_mixer: Optional[Dict[str, float]] = field(
         default=None,
-        metadata={"help": ("Datasets and their proportions to be used for training ift/rl.")},
+        metadata={
+            "help": ("Datasets and their proportions to be used for training ift/rl.")
+        },
     )
     text_column: Optional[str] = field(
         default="text",
-        metadata={"help": "The column name to use for the text in the dataset (only used for continued pretraining)."},
+        metadata={
+            "help": "The column name to use for the text in the dataset (only used for continued pretraining)."
+        },
     )
     dataset_splits: Optional[List[str]] = field(
         default_factory=lambda: ["train", "test"],
@@ -215,7 +242,9 @@ class DataArguments:
     )
     dataset_configs: Optional[List[str]] = field(
         default=None,
-        metadata={"help": "List of dataset config names. If given must be the same length as 'dataset_mixer' keys."},
+        metadata={
+            "help": "List of dataset config names. If given must be the same length as 'dataset_mixer' keys."
+        },
     )
     preprocessing_num_workers: Optional[int] = field(
         default=None,
@@ -246,11 +275,17 @@ class SFTConfig(transformers.TrainingArguments):
     )
     max_seq_length: Optional[int] = field(
         default=None,
-        metadata={"help": ("Used by TRL for reward model training, which tries to read this parameter in init.")},
+        metadata={
+            "help": (
+                "Used by TRL for reward model training, which tries to read this parameter in init."
+            )
+        },
     )
     logging_first_step: bool = field(
         default=True,
-        metadata={"help": ("Whether to log and evaluate the first global_step or not.")},
+        metadata={
+            "help": ("Whether to log and evaluate the first global_step or not.")
+        },
     )
     optim: Optional[str] = field(default="adamw_torch")
 
@@ -263,7 +298,9 @@ class DPOConfig(transformers.TrainingArguments):
 
     beta: Optional[float] = field(
         default=0.1,
-        metadata={"help": "The beta factor in DPO loss. Higher beta means less divergence from the initial policy."},
+        metadata={
+            "help": "The beta factor in DPO loss. Higher beta means less divergence from the initial policy."
+        },
     )
     hub_model_revision: Optional[str] = field(
         default="main",
@@ -271,19 +308,31 @@ class DPOConfig(transformers.TrainingArguments):
     )
     logging_first_step: bool = field(
         default=True,
-        metadata={"help": ("Whether to log and evaluate the first global_step or not.")},
+        metadata={
+            "help": ("Whether to log and evaluate the first global_step or not.")
+        },
     )
     max_prompt_length: Optional[int] = field(
         default=None,
-        metadata={"help": ("For DPO, the maximum length of the prompt to use for conditioning the model.")},
+        metadata={
+            "help": (
+                "For DPO, the maximum length of the prompt to use for conditioning the model."
+            )
+        },
     )
     max_length: Optional[int] = field(
         default=None,
-        metadata={"help": ("Used by TRL for reward model training, which tries to read this parameter in init.")},
+        metadata={
+            "help": (
+                "Used by TRL for reward model training, which tries to read this parameter in init."
+            )
+        },
     )
     optim: Optional[str] = field(default="rmsprop")
     remove_unused_columns: bool = field(default=False)
-    loss_type: Optional[str] = field(default="sigmoid", metadata={"help": ("The loss type for DPO.")})
+    loss_type: Optional[str] = field(
+        default="sigmoid", metadata={"help": ("The loss type for DPO.")}
+    )
 
 
 @dataclass
@@ -318,25 +367,39 @@ class ORPOConfig(transformers.TrainingArguments):
     )
     padding_value: Optional[int] = field(
         default=None,
-        metadata={"help": "The padding value if it is different to the tokenizer's pad_token_id."},
+        metadata={
+            "help": "The padding value if it is different to the tokenizer's pad_token_id."
+        },
     )
     truncation_mode: str = field(
         default="keep_end",
-        metadata={"help": "The truncation mode to use, either `keep_end` or `keep_start`."},
+        metadata={
+            "help": "The truncation mode to use, either `keep_end` or `keep_start`."
+        },
     )
 
     generate_during_eval: bool = field(
         default=False,
-        metadata={"help": "Whether to sample and log generations during evaluation step."},
+        metadata={
+            "help": "Whether to sample and log generations during evaluation step."
+        },
     )
     is_encoder_decoder: Optional[bool] = field(
         default=None,
-        metadata={"help": ("If no model is provided, we need to know if the model_init returns an encoder-decoder.")},
+        metadata={
+            "help": (
+                "If no model is provided, we need to know if the model_init returns an encoder-decoder."
+            )
+        },
     )
 
     model_init_kwargs: Optional[Dict] = field(
         default=None,
-        metadata={"help": ("Dict of Optional kwargs to pass when instantiating the model from a string")},
+        metadata={
+            "help": (
+                "Dict of Optional kwargs to pass when instantiating the model from a string"
+            )
+        },
     )
 
     dataset_num_proc: Optional[int] = field(
@@ -345,6 +408,26 @@ class ORPOConfig(transformers.TrainingArguments):
     )
 
 
+@dataclass
+class IterativeDpoArguments:
+    dataset_path: str = field(
+        default=None,
+        metadata={
+            "help": "Huggingface dataset name or path to dataset directory, for the dataset that will be fine-tuned."
+        },
+    )
+    train_split: str = field(
+        default="train",
+        metadata={"help": "Dataset split to use for training."},
+    )
+    test_split: str = field(
+        default="test",
+        metadata={"help": "Dataset split to use for testing."},
+    )
+    num_iterations: int = field(
+        default=3,
+        metadata={"help": "Number of iterations of DPO to run."},
+    )
 
 
 @dataclass
@@ -355,16 +438,10 @@ class CandidateArguments:
             "help": "Huggingface model name or path to model directory, for the model that will be used for generation, defaults to SFT model or previous iteration model."
         },
     )
-    input_dataset_path: str = field(
+    dataset_path: str = field(
         default=None,
         metadata={
             "help": "Path to the input dataset, that will be used to generate candidates, defaults to previous iteration output dataset."
-        },
-    )
-    output_dataset_path: str = field(
-        default=None,
-        metadata={
-            "help": "Path to the output dataset, where the generated candidates will be saved."
         },
     )
     messages_column: str = field(
@@ -374,42 +451,30 @@ class CandidateArguments:
         },
     )
     num_samples: int = field(
-      default=5,
-      metadata={
-          "help": "Number of samples to generate for each input."
-      },
+        default=5,
+        metadata={"help": "Number of samples to generate for each input."},
     )
     batch_size: int = field(
-      default=1,
-      metadata={
-          "help": "Batch size for generation."
-      },
+        default=1,
+        metadata={"help": "Batch size for generation."},
     )
     max_new_tokens: int = field(
-      default=2048,
-      metadata={
-          "help": "Maximum number of new tokens to generate."
-      },
+        default=2048,
+        metadata={"help": "Maximum number of new tokens to generate."},
     )
     temperature: float = field(
-      default=0.7,
-      metadata={
-          "help": "Temperature for generation."
-      },
+        default=0.7,
+        metadata={"help": "Temperature for generation."},
     )
     top_k: int = field(
-      default=-1,
-      metadata={
-          "help": "Top-k for generation."
-      },
+        default=-1,
+        metadata={"help": "Top-k for generation."},
     )
     top_p: float = field(
-      default=1.0,
-      metadata={
-          "help": "Top-p for generation."
-      },
+        default=1.0,
+        metadata={"help": "Top-p for generation."},
     )
-    
+
 
 @dataclass
 class RankingArguments:
@@ -419,15 +484,14 @@ class RankingArguments:
             "help": "Huggingface model name or path to model directory, for the model that will be used for generation, defaults to SFT model or previous iteration model."
         },
     )
-    input_rank_dataset_path: str = field(
+    rank_trust_remote_code: bool = field(
+        default=False,
+        metadata={"help": "Trust remote code when loading a model."},
+    )
+
+    dataset_path: str = field(
         default=None,
         metadata={
             "help": "Path to the input dataset, that will be used to generate candidates, defaults to previous iteration output dataset."
-        },
-    )
-    output_rank_dataset_path: str = field(
-        default=None,
-        metadata={
-            "help": "Path to the output dataset, where the generated candidates will be saved."
         },
     )

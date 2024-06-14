@@ -64,15 +64,21 @@ def apply_chat_template(
                 maybe_insert_system_message(chosen_messages, tokenizer)
                 maybe_insert_system_message(rejected_messages, tokenizer)
 
-            example["text_chosen"] = tokenizer.apply_chat_template(chosen_messages, tokenize=False)
-            example["text_rejected"] = tokenizer.apply_chat_template(rejected_messages, tokenize=False)
+            example["text_chosen"] = tokenizer.apply_chat_template(
+                chosen_messages, tokenize=False
+            )
+            example["text_rejected"] = tokenizer.apply_chat_template(
+                rejected_messages, tokenize=False
+            )
         else:
             raise ValueError(
                 f"Could not format example as dialogue for `rm` task! Require `[chosen, rejected]` keys but found {list(example.keys())}"
             )
     elif task in ["dpo", "orpo"]:
         if all(k in example.keys() for k in ("chosen", "rejected")):
-            if not is_openai_format(example["chosen"]) or not is_openai_format(example["rejected"]):
+            if not is_openai_format(example["chosen"]) or not is_openai_format(
+                example["rejected"]
+            ):
                 raise ValueError(
                     f"Could not format example as dialogue for `{task}` task! Require OpenAI format for all messages"
                 )
@@ -93,9 +99,15 @@ def apply_chat_template(
             if auto_insert_empty_system_msg:
                 maybe_insert_system_message(prompt_messages, tokenizer)
 
-            example["text_prompt"] = tokenizer.apply_chat_template(prompt_messages, tokenize=False)
-            example["text_chosen"] = tokenizer.apply_chat_template(chosen_messages, tokenize=False)
-            example["text_rejected"] = tokenizer.apply_chat_template(rejected_messages, tokenize=False)
+            example["text_prompt"] = tokenizer.apply_chat_template(
+                prompt_messages, tokenize=False
+            )
+            example["text_chosen"] = tokenizer.apply_chat_template(
+                chosen_messages, tokenize=False
+            )
+            example["text_rejected"] = tokenizer.apply_chat_template(
+                rejected_messages, tokenize=False
+            )
         else:
             raise ValueError(
                 f"Could not format example as dialogue for `{task}` task! Require either the "
@@ -117,7 +129,9 @@ def is_openai_format(messages: Any) -> bool:
     Returns:
         `bool`: Whether the messages are in OpenAI format.
     """
-    if isinstance(messages, list) and all(isinstance(message, dict) for message in messages):
+    if isinstance(messages, list) and all(
+        isinstance(message, dict) for message in messages
+    ):
         return all("role" in message and "content" in message for message in messages)
     return False
 
@@ -204,7 +218,9 @@ def mix_datasets(
     columns_to_keep = [] if columns_to_keep is None else columns_to_keep
 
     if configs is not None and len(configs) != len(dataset_mixer):
-        raise ValueError("The number of given dataset config names must be the same as the given number of datasets.")
+        raise ValueError(
+            "The number of given dataset config names must be the same as the given number of datasets."
+        )
 
     raw_datasets = DatasetDict()
     raw_train_datasets = []
@@ -221,13 +237,17 @@ def mix_datasets(
                 dataset = load_from_disk(os.path.join(ds, split))
 
             # Remove redundant columns to avoid schema conflicts on load
-            dataset = dataset.remove_columns([col for col in dataset.column_names if col not in columns_to_keep])
+            dataset = dataset.remove_columns(
+                [col for col in dataset.column_names if col not in columns_to_keep]
+            )
             if "train" in split:
                 raw_train_datasets.append(dataset)
             elif "test" in split:
                 raw_val_datasets.append(dataset)
             else:
-                raise ValueError(f"Split type {split} not recognized as one of test or train.")
+                raise ValueError(
+                    f"Split type {split} not recognized as one of test or train."
+                )
 
     if any(frac < 0 for frac in fracs):
         raise ValueError("Dataset fractions cannot be negative.")
@@ -244,7 +264,9 @@ def mix_datasets(
     # No subsampling for test datasets to enable fair comparison across models
     if len(raw_val_datasets) > 0:
         if shuffle:
-            raw_datasets["test"] = concatenate_datasets(raw_val_datasets).shuffle(seed=42)
+            raw_datasets["test"] = concatenate_datasets(raw_val_datasets).shuffle(
+                seed=42
+            )
         else:
             raw_datasets["test"] = concatenate_datasets(raw_val_datasets)
 

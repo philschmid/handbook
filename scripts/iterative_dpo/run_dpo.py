@@ -1,16 +1,28 @@
-
-# TODO
+#!/usr/bin/env python
+# coding=utf-8
+# Copyright 2023 The HuggingFace Inc. team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import logging
+import os
 import random
 import sys
 
 import torch
 import transformers
-from transformers import AutoModelForCausalLM, set_seed
+from transformers import AutoModelForCausalLM, set_seed, AutoTokenizer
 
 from alignment import (
-    DataArguments,
-    DPOConfig,
     H4ArgumentParser,
     ModelArguments,
     apply_chat_template,
@@ -22,17 +34,19 @@ from alignment import (
     get_quantization_config,
     get_tokenizer,
     is_adapter_model,
+    DPOConfig,
 )
 from peft import PeftConfig, PeftModel
 from trl import DPOTrainer
 
+from datasets import load_dataset
 
 logger = logging.getLogger(__name__)
 
 
 def main():
-    parser = H4ArgumentParser((ModelArguments, DataArguments, DPOConfig))
-    model_args, data_args, training_args = parser.parse()
+    parser = H4ArgumentParser((ModelArguments, DPOConfig))
+    model_args, training_args = parser.parse()
 
     #######
     # Setup
@@ -50,10 +64,9 @@ def main():
 
     # Log on each process the small summary:
     logger.info(f"Model parameters {model_args}")
-    logger.info(f"Data parameters {data_args}")
     logger.info(f"Training/evaluation parameters {training_args}")
 
-    # Check for last checkpoint
+    # Check for last checkpoint for continuing training
     last_checkpoint = get_checkpoint(training_args)
     if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
         logger.info(f"Checkpoint detected, resuming training at {last_checkpoint=}.")
@@ -64,71 +77,52 @@ def main():
     ###############
     # Load datasets
     ###############
-    raw_datasets = get_datasets(
-        data_args,
-        splits=data_args.dataset_splits,
-        configs=data_args.dataset_configs,
-        columns_to_keep=["messages", "chosen", "rejected", "prompt", "completion", "label"],
-    )
-    logger.info(
-        f"Training on the following splits: {[split + ' : ' + str(dset.num_rows) for split, dset in raw_datasets.items()]}"
-    )
-    column_names = list(raw_datasets["train"].features)
+    dataset_path = os.path.join(training_args.output_dir, "dpo.json")
+    train_dataset = load_dataset("json", data_files=dataset_path, split="train")
+    column_names = list(train_dataset.features)
 
     #####################################
     # Load tokenizer and process datasets
     #####################################
-    data_args.truncation_side = "left"  # Truncate from left to ensure we don't lose labels in final turn
-    tokenizer = get_tokenizer(model_args, data_args)
+    tokenizer = AutoTokenizer.from_pretrained(
+        (
+            model_args.model_name_or_path
+            if model_args.tokenizer_name_or_path is None
+            else model_args.tokenizer_name_or_path
+        ),
+        revision=model_args.model_revision,
+        trust_remote_code=model_args.trust_remote_code,
+    )
 
     #####################
     # Apply chat template
     #####################
-    raw_datasets = raw_datasets.map(
+    train_dataset = train_dataset.map(
         apply_chat_template,
         fn_kwargs={
             "tokenizer": tokenizer,
             "task": "dpo",
-            "auto_insert_empty_system_msg": data_args.auto_insert_empty_system_msg,
+            "auto_insert_empty_system_msg": True,
         },
-        num_proc=data_args.preprocessing_num_workers,
         remove_columns=column_names,
         desc="Formatting comparisons with prompt template",
     )
-
-    ##########################
-    # Decontaminate benchmarks
-    ##########################
-    num_raw_train_samples = len(raw_datasets["train"])
-    raw_datasets = raw_datasets.filter(
-        decontaminate_humaneval,
-        fn_kwargs={"text_column": "text_chosen"},
-        batched=True,
-        batch_size=10_000,
-        num_proc=1,
-        desc="Decontaminating HumanEval samples",
-    )
-    num_filtered_train_samples = num_raw_train_samples - len(raw_datasets["train"])
-    logger.info(
-        f"Decontaminated {num_filtered_train_samples} ({num_filtered_train_samples/num_raw_train_samples * 100:.2f}%) samples from the training set."
-    )
-
     # Replace column names with what TRL needs, text_chosen -> chosen and text_rejected -> rejected
-    for split in ["train", "test"]:
-        raw_datasets[split] = raw_datasets[split].rename_columns(
-            {"text_prompt": "prompt", "text_chosen": "chosen", "text_rejected": "rejected"}
-        )
+    train_dataset = train_dataset.rename_columns(
+        {
+            "text_prompt": "prompt",
+            "text_chosen": "chosen",
+            "text_rejected": "rejected",
+        }
+    )
 
-    # Log a few random samples from the training set:
-    for index in random.sample(range(len(raw_datasets["train"])), 3):
-        logger.info(f"Prompt sample {index} of the raw training set:\n\n{raw_datasets['train'][index]['prompt']}")
-        logger.info(f"Chosen sample {index} of the raw training set:\n\n{raw_datasets['train'][index]['chosen']}")
-        logger.info(f"Rejected sample {index} of the raw training set:\n\n{raw_datasets['train'][index]['rejected']}")
+    quantization_config = get_quantization_config(model_args)
 
     torch_dtype = (
-        model_args.torch_dtype if model_args.torch_dtype in ["auto", None] else getattr(torch, model_args.torch_dtype)
+        model_args.torch_dtype
+        if model_args.torch_dtype in ["auto", None]
+        else getattr(torch, model_args.torch_dtype)
     )
-    quantization_config = get_quantization_config(model_args)
 
     model_kwargs = dict(
         revision=model_args.model_revision,
@@ -143,14 +137,18 @@ def main():
     model = model_args.model_name_or_path
     if is_adapter_model(model, model_args.model_revision) is True:
         logger.info(f"Loading SFT adapter for {model_args.model_name_or_path=}")
-        peft_config = PeftConfig.from_pretrained(model_args.model_name_or_path, revision=model_args.model_revision)
+        peft_config = PeftConfig.from_pretrained(
+            model_args.model_name_or_path, revision=model_args.model_revision
+        )
         model_kwargs = dict(
             revision=model_args.base_model_revision,
             trust_remote_code=model_args.trust_remote_code,
             use_flash_attention_2=model_args.use_flash_attention_2,
             torch_dtype=torch_dtype,
             use_cache=False if training_args.gradient_checkpointing else True,
-            device_map=get_kbit_device_map() if quantization_config is not None else None,
+            device_map=(
+                get_kbit_device_map() if quantization_config is not None else None
+            ),
             quantization_config=quantization_config,
         )
         base_model = AutoModelForCausalLM.from_pretrained(
@@ -181,8 +179,7 @@ def main():
         ref_model_init_kwargs=ref_model_kwargs,
         args=training_args,
         beta=training_args.beta,
-        train_dataset=raw_datasets["train"],
-        eval_dataset=raw_datasets["test"],
+        train_dataset=train_dataset,
         tokenizer=tokenizer,
         max_length=training_args.max_length,
         max_prompt_length=training_args.max_prompt_length,
@@ -200,7 +197,7 @@ def main():
         checkpoint = last_checkpoint
     train_result = trainer.train(resume_from_checkpoint=checkpoint)
     metrics = train_result.metrics
-    metrics["train_samples"] = len(raw_datasets["train"])
+    metrics["train_samples"] = len(train_dataset)
     trainer.log_metrics("train", metrics)
     trainer.save_metrics("train", metrics)
     trainer.save_state()
@@ -217,8 +214,6 @@ def main():
     # Save everything else on main process
     kwargs = {
         "finetuned_from": model_args.model_name_or_path,
-        "dataset": list(data_args.dataset_mixer.keys()),
-        "dataset_tags": list(data_args.dataset_mixer.keys()),
         "tags": ["alignment-handbook"],
     }
     if trainer.accelerator.is_main_process:
@@ -226,16 +221,6 @@ def main():
         # Restore k,v cache for fast inference
         trainer.model.config.use_cache = True
         trainer.model.config.save_pretrained(training_args.output_dir)
-
-    ##########
-    # Evaluate
-    ##########
-    if training_args.do_eval:
-        logger.info("*** Evaluate ***")
-        metrics = trainer.evaluate()
-        metrics["eval_samples"] = len(raw_datasets["test"])
-        trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", metrics)
 
     if training_args.push_to_hub is True:
         logger.info("Pushing to hub...")

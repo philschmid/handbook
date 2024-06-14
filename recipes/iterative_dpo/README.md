@@ -4,7 +4,7 @@
 TODO
 
 ```bash
-python scripts/iterative_dpo/run_iterative_dpo.py --config recipes/iterative_dpo/dev.yaml
+python scripts/iterative_dpo/run_iterative_dpo.py recipes/iterative_dpo/dev.yaml --output_dir test/iterative_dpo
 ```
 
 

@@ -64,13 +64,17 @@ def get_quantization_config(model_args: ModelArguments) -> BitsAndBytesConfig | 
 
 
 def get_tokenizer(
-    model_args: ModelArguments, data_args: DataArguments, auto_set_chat_template: bool = True
+    model_args: ModelArguments,
+    data_args: DataArguments,
+    auto_set_chat_template: bool = True,
 ) -> PreTrainedTokenizer:
     """Get the tokenizer for the model."""
     tokenizer = AutoTokenizer.from_pretrained(
-        model_args.model_name_or_path
-        if model_args.tokenizer_name_or_path is None
-        else model_args.tokenizer_name_or_path,
+        (
+            model_args.model_name_or_path
+            if model_args.tokenizer_name_or_path is None
+            else model_args.tokenizer_name_or_path
+        ),
         revision=model_args.model_revision,
         trust_remote_code=model_args.trust_remote_code,
     )
@@ -86,7 +90,11 @@ def get_tokenizer(
 
     if data_args.chat_template is not None:
         tokenizer.chat_template = data_args.chat_template
-    elif auto_set_chat_template and tokenizer.chat_template is None and tokenizer.default_chat_template is None:
+    elif (
+        auto_set_chat_template
+        and tokenizer.chat_template is None
+        and tokenizer.default_chat_template is None
+    ):
         tokenizer.chat_template = DEFAULT_CHAT_TEMPLATE
 
     return tokenizer
@@ -102,7 +110,7 @@ def get_peft_config(model_args: ModelArguments) -> PeftConfig | None:
         lora_dropout=model_args.lora_dropout,
         bias="none",
         task_type="CAUSAL_LM",
-        target_modules=model_args.lora_target_modules,
+        target_modules=model_args.lora_target_modules[0],
         modules_to_save=model_args.lora_modules_to_save,
     )
 
@@ -116,7 +124,9 @@ def is_adapter_model(model_name_or_path: str, revision: str = "main") -> bool:
     except (HFValidationError, RepositoryNotFoundError):
         # If not, check local repo
         repo_files = os.listdir(model_name_or_path)
-    return "adapter_model.safetensors" in repo_files or "adapter_model.bin" in repo_files
+    return (
+        "adapter_model.safetensors" in repo_files or "adapter_model.bin" in repo_files
+    )
 
 
 def get_checkpoint(training_args: SFTConfig | DPOConfig) -> Path | None:
