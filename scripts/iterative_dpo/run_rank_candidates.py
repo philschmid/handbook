@@ -16,7 +16,7 @@ from transformers import pipeline, AutoModelForSequenceClassification, AutoToken
 # CUDA_VISIBLE_DEVICES=0 python scripts/iterative_dpo/run_rank_candidates.py \
 # --rank_model_name_or_path RLHFlow/ArmoRM-Llama3-8B-v0.1 \
 # --rank_trust_remote_code True \
-# --dataset_path test/iterative_dpo/iteration_0/candidates.json \
+# --dataset_path test/iterative_dpo/iteration_0/candidates.json
 # config file example
 # CUDA_VISIBLE_DEVICES=0 python scripts/iterative_dpo/run_rank_candidates.py --config recipes/iterative_dpo/dev.yaml
 
@@ -143,7 +143,6 @@ def main():
     logging.info(
         f"Ranking {len(ranking_ds)} took {time.time() - start_time:.2f} seconds."
     )
-
     save_dir = os.path.dirname(script_args.dataset_path)
     ranking_ds.to_json(os.path.join(save_dir, "ranked_candidates.json"))
 

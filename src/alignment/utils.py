@@ -1,6 +1,22 @@
+import sys
 import subprocess
 import shlex
 import logging
+import transformers
+
+
+def setup_logging(log_level, logger):
+    """Set up logging for the script."""
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+    logger.setLevel(log_level)
+    transformers.utils.logging.set_verbosity(log_level)
+    transformers.utils.logging.enable_default_handler()
+    transformers.utils.logging.enable_explicit_format()
+    return logger
 
 
 def execute_cli_script(script_path, args_dict, entrypoint="python"):

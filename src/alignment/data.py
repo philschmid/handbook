@@ -64,10 +64,10 @@ def apply_chat_template(
                 maybe_insert_system_message(chosen_messages, tokenizer)
                 maybe_insert_system_message(rejected_messages, tokenizer)
 
-            example["text_chosen"] = tokenizer.apply_chat_template(
+            example["chosen"] = tokenizer.apply_chat_template(
                 chosen_messages, tokenize=False
             )
-            example["text_rejected"] = tokenizer.apply_chat_template(
+            example["rejected"] = tokenizer.apply_chat_template(
                 rejected_messages, tokenize=False
             )
         else:
@@ -85,27 +85,22 @@ def apply_chat_template(
 
             # For DPO/ORPO, the inputs are triples of (prompt, chosen, rejected), where `chosen` and `rejected` are the final turn of a dialogue
             # We therefore need to extract the N-1 turns to form the prompt
-            if "prompt" in example and is_openai_format(example["prompt"]):
-                prompt_messages = example["prompt"]
-                chosen_messages = example["chosen"]
-                rejected_messages = example["rejected"]
-            else:
-                prompt_messages = example["chosen"][:-1]
-                # Now we extract the final turn to define chosen/rejected responses
-                chosen_messages = example["chosen"][-1:]
-                rejected_messages = example["rejected"][-1:]
+            prompt_messages = example["chosen"][:-1]
+            # Now we extract the final turn to define chosen/rejected responses
+            chosen_messages = example["chosen"][-1:]
+            rejected_messages = example["rejected"][-1:]
 
             # Prepend a system message if the first message is not a system message
             if auto_insert_empty_system_msg:
                 maybe_insert_system_message(prompt_messages, tokenizer)
 
-            example["text_prompt"] = tokenizer.apply_chat_template(
+            example["prompt"] = tokenizer.apply_chat_template(
                 prompt_messages, tokenize=False
             )
-            example["text_chosen"] = tokenizer.apply_chat_template(
+            example["chosen"] = tokenizer.apply_chat_template(
                 chosen_messages, tokenize=False
             )
-            example["text_rejected"] = tokenizer.apply_chat_template(
+            example["rejected"] = tokenizer.apply_chat_template(
                 rejected_messages, tokenize=False
             )
         else:

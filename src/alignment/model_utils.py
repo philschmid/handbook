@@ -17,7 +17,12 @@ from pathlib import Path
 from typing import Dict
 
 import torch
-from transformers import AutoTokenizer, BitsAndBytesConfig, PreTrainedTokenizer
+from transformers import (
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    PreTrainedTokenizer,
+    TrainingArguments,
+)
 from transformers.trainer_utils import get_last_checkpoint
 
 from accelerate import Accelerator
@@ -25,8 +30,7 @@ from huggingface_hub import list_repo_files
 from huggingface_hub.utils._errors import RepositoryNotFoundError
 from huggingface_hub.utils._validators import HFValidationError
 from peft import LoraConfig, PeftConfig
-
-from .configs import DataArguments, DPOConfig, ModelArguments, SFTConfig
+from .configs import DataArguments, ModelArguments
 from .data import DEFAULT_CHAT_TEMPLATE
 
 
@@ -129,7 +133,7 @@ def is_adapter_model(model_name_or_path: str, revision: str = "main") -> bool:
     )
 
 
-def get_checkpoint(training_args: SFTConfig | DPOConfig) -> Path | None:
+def get_checkpoint(training_args: TrainingArguments) -> Path | None:
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir):
         last_checkpoint = get_last_checkpoint(training_args.output_dir)

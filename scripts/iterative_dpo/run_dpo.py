@@ -14,85 +14,50 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import os
-import random
-import sys
-
 import torch
-import transformers
-from transformers import AutoModelForCausalLM, set_seed, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    set_seed,
+)
 
 from alignment import (
-    H4ArgumentParser,
     ModelArguments,
+    DataArguments,
     apply_chat_template,
     decontaminate_humaneval,
     get_checkpoint,
-    get_datasets,
+    get_tokenizer,
+)
+from trl import (
+    DPOTrainer,
+    TrlParser,
+    DPOConfig,
     get_kbit_device_map,
     get_peft_config,
     get_quantization_config,
-    get_tokenizer,
-    is_adapter_model,
-    DPOConfig,
 )
-from peft import PeftConfig, PeftModel
-from trl import DPOTrainer
 
 from datasets import load_dataset
+
+from alignment.utils import setup_logging
 
 logger = logging.getLogger(__name__)
 
 
-def main():
-    parser = H4ArgumentParser((ModelArguments, DPOConfig))
-    model_args, training_args = parser.parse()
-
-    #######
-    # Setup
-    #######
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-    log_level = training_args.get_process_log_level()
-    logger.setLevel(log_level)
-    transformers.utils.logging.set_verbosity(log_level)
-    transformers.utils.logging.enable_default_handler()
-    transformers.utils.logging.enable_explicit_format()
-
-    # Log on each process the small summary:
-    logger.info(f"Model parameters {model_args}")
-    logger.info(f"Training/evaluation parameters {training_args}")
-
-    # Check for last checkpoint for continuing training
-    last_checkpoint = get_checkpoint(training_args)
-    if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
-        logger.info(f"Checkpoint detected, resuming training at {last_checkpoint=}.")
-
-    # Set seed for reproducibility
-    set_seed(training_args.seed)
-
+def dpo_main(
+    model_args: ModelArguments, data_args: DataArguments, training_args: DPOConfig
+):
     ###############
     # Load datasets
     ###############
-    dataset_path = os.path.join(training_args.output_dir, "dpo.json")
-    train_dataset = load_dataset("json", data_files=dataset_path, split="train")
-    column_names = list(train_dataset.features)
+    train_dataset = load_dataset(
+        "json", data_files=data_args.dataset_id_or_path, split="train"
+    )
 
     #####################################
     # Load tokenizer and process datasets
     #####################################
-    tokenizer = AutoTokenizer.from_pretrained(
-        (
-            model_args.model_name_or_path
-            if model_args.tokenizer_name_or_path is None
-            else model_args.tokenizer_name_or_path
-        ),
-        revision=model_args.model_revision,
-        trust_remote_code=model_args.trust_remote_code,
-    )
+    tokenizer = get_tokenizer(model_args, data_args)
 
     #####################
     # Apply chat template
@@ -104,86 +69,63 @@ def main():
             "task": "dpo",
             "auto_insert_empty_system_msg": True,
         },
-        remove_columns=column_names,
         desc="Formatting comparisons with prompt template",
     )
-    # Replace column names with what TRL needs, text_chosen -> chosen and text_rejected -> rejected
-    train_dataset = train_dataset.rename_columns(
-        {
-            "text_prompt": "prompt",
-            "text_chosen": "chosen",
-            "text_rejected": "rejected",
-        }
-    )
+    # remove all columns except chosen, rejected
+    print(f"Columns: {train_dataset.features.keys()}")
+    train_dataset = train_dataset.select(["chosen", "rejected"])
 
-    quantization_config = get_quantization_config(model_args)
+    # Check for last checkpoint for continuing training
+    last_checkpoint = get_checkpoint(training_args)
+    if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+        logger.info(f"Checkpoint detected, resuming training at {last_checkpoint=}.")
+
+    #######################################
+    # Load the model and/or reference model
+    #######################################
 
     torch_dtype = (
         model_args.torch_dtype
         if model_args.torch_dtype in ["auto", None]
         else getattr(torch, model_args.torch_dtype)
     )
+    quantization_config = get_quantization_config(model_args)
 
     model_kwargs = dict(
         revision=model_args.model_revision,
         trust_remote_code=model_args.trust_remote_code,
-        use_flash_attention_2=model_args.use_flash_attention_2,
+        attn_implementation=model_args.attn_implementation,
         torch_dtype=torch_dtype,
         use_cache=False if training_args.gradient_checkpointing else True,
         device_map=get_kbit_device_map() if quantization_config is not None else None,
         quantization_config=quantization_config,
     )
+    model = AutoModelForCausalLM.from_pretrained(
+        model_args.model_name_or_path, **model_kwargs
+    )
 
-    model = model_args.model_name_or_path
-    if is_adapter_model(model, model_args.model_revision) is True:
-        logger.info(f"Loading SFT adapter for {model_args.model_name_or_path=}")
-        peft_config = PeftConfig.from_pretrained(
-            model_args.model_name_or_path, revision=model_args.model_revision
+    peft_config = get_peft_config(model_args)
+    # Checks wether we use adapters for reference model or not
+    if peft_config is None:
+        model_ref = AutoModelForCausalLM.from_pretrained(
+            model_args.model_name_or_path, **model_kwargs
         )
-        model_kwargs = dict(
-            revision=model_args.base_model_revision,
-            trust_remote_code=model_args.trust_remote_code,
-            use_flash_attention_2=model_args.use_flash_attention_2,
-            torch_dtype=torch_dtype,
-            use_cache=False if training_args.gradient_checkpointing else True,
-            device_map=(
-                get_kbit_device_map() if quantization_config is not None else None
-            ),
-            quantization_config=quantization_config,
-        )
-        base_model = AutoModelForCausalLM.from_pretrained(
-            peft_config.base_model_name_or_path,
-            **model_kwargs,
-        )
-        model = PeftModel.from_pretrained(
-            base_model,
-            model_args.model_name_or_path,
-            revision=model_args.model_revision,
-        )
-        model_kwargs = None
-
-    ref_model = model
-    ref_model_kwargs = model_kwargs
-
-    if model_args.use_peft is True:
-        ref_model = None
-        ref_model_kwargs = None
+    else:
+        model_ref = None
 
     #########################
     # Instantiate DPO trainer
     #########################
     trainer = DPOTrainer(
         model,
-        ref_model,
-        model_init_kwargs=model_kwargs,
-        ref_model_init_kwargs=ref_model_kwargs,
+        ref_model=model_ref,
         args=training_args,
         beta=training_args.beta,
         train_dataset=train_dataset,
         tokenizer=tokenizer,
         max_length=training_args.max_length,
         max_prompt_length=training_args.max_prompt_length,
-        peft_config=get_peft_config(model_args),
+        peft_config=peft_config,
         loss_type=training_args.loss_type,
     )
 
@@ -195,7 +137,9 @@ def main():
         checkpoint = training_args.resume_from_checkpoint
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
+    # Train the model
     train_result = trainer.train(resume_from_checkpoint=checkpoint)
+    # Log and save metrics
     metrics = train_result.metrics
     metrics["train_samples"] = len(train_dataset)
     trainer.log_metrics("train", metrics)
@@ -227,6 +171,22 @@ def main():
         trainer.push_to_hub(**kwargs)
 
     logger.info("*** Training complete! ***")
+
+
+def main():
+    parser = TrlParser((ModelArguments, DataArguments, DPOConfig))
+    model_args, data_args, training_args = parser.parse_args_and_config()
+    logger = setup_logging(training_args.get_process_log_level(), logger)
+
+    # Log on each process the small summary:
+    logger.info(f"Model parameters {model_args}")
+    logger.info(f"Training/evaluation parameters {training_args}")
+
+    # Set seed for reproducibility
+    set_seed(training_args.seed)
+
+    # Run the main training loop
+    dpo_main(model_args, data_args, training_args)
 
 
 if __name__ == "__main__":

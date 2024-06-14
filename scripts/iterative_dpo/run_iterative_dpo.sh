@@ -34,18 +34,30 @@ echo "Output directory: $output_dir"
 # 5. save DPO model and start next iteration
 
 # # Split the data for iteration 
-# python scripts/iterative_dpo/run_prepare_dataset.py
+python scripts/iterative_dpo/run_prepare_dataset.py
 
 # Loop over the num_iterations and add them
 for ((i=1; i<=num_iteration; i++)); do
-# Generate Candidates
 echo "Running iteration $i"
+########################
+# 1. Generate Candidates
+########################
 python scripts/iterative_dpo/run_generate_candidates.py --config $config --dataset_path $output_dir/iteration_$i/prompts.json
-# Rank Candidates
+
+########################
+# 2. Rank Candidates
+########################
 CUDA_VISIBLE_DEVICES=0 python scripts/iterative_dpo/run_rank_candidates.py --config $config --dataset_path $output_dir/iteration_$i/candidates.json
 # Generate comparison dataset
-python scripts/iterative_dpo/run_prepare_pairwise_dataset.py --dataset_path $output_dir/iteration_$i/candidates.json --current_iteration $i
-# 
-accelerate launch scripts/iterative_dpo/run_train_dpo.py --config $config --dataset_path $output_dir/iteration_$i/pairwise.json
-done
+echo "CUDA_VISIBLE_DEVICES $CUDA_VISIBLE_DEVICES"
 
+########################
+# 3. Generate DPO dataset
+########################
+python scripts/iterative_dpo/run_prepare_pairwise_dataset.py --dataset_path $output_dir/iteration_$i/ranked_candidates.json --current_iteration $i
+
+########################
+# 4. Train model with DPO
+########################
+accelerate launch scripts/iterative_dpo/run_train_dpo.py --config $config --output_dir $output_dir/iteration_$i  --dataset_path $output_dir/iteration_$i/pairwise.json
+python /home/ubuntu/alignment-handbook/scripts/iterative_dpo/run_dpo.py --config recipes/iterative_dpo/dev.yaml --output_dir test/iterative_dpo/iteration_0 --dataset_id_or_path test/iterative_dpo/iteration_0/pairwise.json

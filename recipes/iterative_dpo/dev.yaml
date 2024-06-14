@@ -4,20 +4,16 @@ output_dir: test/iterative_dpo
 # model_name_or_path: alignment-handbook/zephyr-7b-sft-qlora
 model_name_or_path:  "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 torch_dtype: bfloat16
-use_flash_attention_2: true
+attn_implementation: "flash_attention_2"
 
 # Dataset 
 dataset_id_or_path:  "HuggingFaceH4/ultrafeedback_binarized"
 train_split: "train_prefs"
 
-# test_split: "test_prefs"
-# dataset_splits:
-# - train_prefs
-# - test_prefs
-
-# Candiate Generatiopn arguments
+# Candiate Generation arguments
 num_samples: 5
 batch_size: 16
+
 # Ranking arguments
 rank_model_name_or_path: RLHFlow/ArmoRM-Llama3-8B-v0.1
 

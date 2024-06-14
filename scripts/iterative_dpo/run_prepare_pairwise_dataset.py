@@ -6,8 +6,8 @@ from trl import TrlParser
 
 # cli args
 # python scripts/iterative_dpo/run_prepare_pairwise_dataset.py \
-# --dataset_path "test/iterative_dpo/iteration_2/prompts.json" \
-# --current_iteration 2
+# --dataset_path "test/iterative_dpo/iteration_0/ranked_candidates.json" \
+# --current_iteration 0
 
 
 @dataclass
@@ -93,10 +93,10 @@ def main():
         )
 
     # Create pairwise dataset with the best two scores
-    # pairwise_ds = create_pairwise_dpo_dataset(dataset)
+    pairwise_ds = create_pairwise_dpo_dataset(dataset)
     # save the pairwise dataset
     save_dir = os.path.dirname(script_args.dataset_path)
-    dataset.to_json(os.path.join(save_dir, "pairwise.json"))
+    pairwise_ds.to_json(os.path.join(save_dir, "pairwise.json"))
 
 
 if __name__ == "__main__":
