@@ -164,11 +164,11 @@ class ModelArguments:
     trust_remote_code: bool = field(
         default=False, metadata={"help": "Trust remote code when loading a model."}
     )
-    use_flash_attention_2: bool = field(
-        default=False,
+    attn_implementation: str = field(
+        default="flash_attention_2",
         metadata={
             "help": (
-                "Whether to use flash attention 2. You must install this manually by running `pip install flash-attn --no-build-isolation`"
+                "The attention implementation to use. Can be 'flash_attention_2' or 'spda'."
             )
         },
     )

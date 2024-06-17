@@ -34,30 +34,58 @@ echo "Output directory: $output_dir"
 # 5. save DPO model and start next iteration
 
 # # Split the data for iteration 
-python scripts/iterative_dpo/run_prepare_dataset.py
+python scripts/iterative_dpo/run_prepare_dataset.py --config $config
+if [ $? -ne 0 ]; then
+  echo "Failed to prepare the dataset"
+  exit 1
+fi
 
 # Loop over the num_iterations and add them
 for ((i=1; i<=num_iteration; i++)); do
-echo "Running iteration $i"
-########################
-# 1. Generate Candidates
-########################
-python scripts/iterative_dpo/run_generate_candidates.py --config $config --dataset_path $output_dir/iteration_$i/prompts.json
+    echo "Running iteration $i"
+    ########################
+    # 1. Generate Candidates
+    ########################
+    # check if iteration > 1 and overwrite the config file generation_model_name_or_path    
+    if [ $i -eq 1 ]; then
+        generation_model_name_or_path=$(grep -E '^model_name_or_path:.*$' $config  | sed -E 's/^model_name_or_path:[[:space:]]*//' | tr -d '"') 
+    else
+        generation_model_name_or_path=$output_dir/iteration_$($i-1)
+    fi
 
-########################
-# 2. Rank Candidates
-########################
-CUDA_VISIBLE_DEVICES=0 python scripts/iterative_dpo/run_rank_candidates.py --config $config --dataset_path $output_dir/iteration_$i/candidates.json
-# Generate comparison dataset
-echo "CUDA_VISIBLE_DEVICES $CUDA_VISIBLE_DEVICES"
+    python scripts/iterative_dpo/run_generate_candidates.py --config recipes/iterative_dpo/dev.yaml --generation_model_name_or_path $generation_model_name_or_path --dataset_path $output_dir/iteration_$i/prompts.json
+    if [ $? -ne 0 ]; then
+        echo "Failed to generate candidates"
+        exit 1
+    fi
 
-########################
-# 3. Generate DPO dataset
-########################
-python scripts/iterative_dpo/run_prepare_pairwise_dataset.py --dataset_path $output_dir/iteration_$i/ranked_candidates.json --current_iteration $i
+    ########################
+    # 2. Rank Candidates
+    ########################
+    CUDA_VISIBLE_DEVICES=0 python scripts/iterative_dpo/run_rank_candidates.py --config $config --dataset_path $output_dir/iteration_$i/candidates.json
+    if [ $? -ne 0 ]; then
+        echo "Failed to rank candidates"
+        exit 1
+    fi
 
-########################
-# 4. Train model with DPO
-########################
-accelerate launch scripts/iterative_dpo/run_train_dpo.py --config $config --output_dir $output_dir/iteration_$i  --dataset_path $output_dir/iteration_$i/pairwise.json
-python /home/ubuntu/alignment-handbook/scripts/iterative_dpo/run_dpo.py --config recipes/iterative_dpo/dev.yaml --output_dir test/iterative_dpo/iteration_0 --dataset_id_or_path test/iterative_dpo/iteration_0/pairwise.json
+    ########################
+    # 3. Generate DPO dataset
+    ########################
+    python scripts/iterative_dpo/run_prepare_pairwise_dataset.py --dataset_path $output_dir/iteration_$i/ranked_candidates.json --current_iteration $((i-1))
+    if [ $? -ne 0 ]; then
+        echo "Failed to prepare the pairwise dataset"
+        exit 1
+    fi
+
+    ########################
+    # 4. Train model with DPO
+    ########################
+    # accelerate launch scripts/iterative_dpo/run_dpo.py --config $config --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json
+    python scripts/iterative_dpo/run_dpo.py --config $config --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json
+    if [ $? -ne 0 ]; then
+        echo "Failed to train the model with DPO"
+        exit 1
+    fi
+done
+
+echo "Finished running $num_iteration iterations"

@@ -21,7 +21,6 @@ from transformers import (
 )
 
 from alignment import (
-    ModelArguments,
     DataArguments,
     apply_chat_template,
     decontaminate_humaneval,
@@ -35,18 +34,25 @@ from trl import (
     get_kbit_device_map,
     get_peft_config,
     get_quantization_config,
+    ModelConfig,
 )
 
 from datasets import load_dataset
 
 from alignment.utils import setup_logging
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 def dpo_main(
-    model_args: ModelArguments, data_args: DataArguments, training_args: DPOConfig
+    model_args: ModelConfig, data_args: DataArguments, training_args: DPOConfig
 ):
+    logger = setup_logging(training_args.get_process_log_level(), _logger)
+
+    # Log on each process the small summary:
+    logger.info(f"Model parameters {model_args}")
+    logger.info(f"Training/evaluation parameters {training_args}")
+
     ###############
     # Load datasets
     ###############
@@ -73,7 +79,7 @@ def dpo_main(
     )
     # remove all columns except chosen, rejected
     print(f"Columns: {train_dataset.features.keys()}")
-    train_dataset = train_dataset.select(["chosen", "rejected"])
+    train_dataset = train_dataset.select_columns(["prompt", "chosen", "rejected"])
 
     # Check for last checkpoint for continuing training
     last_checkpoint = get_checkpoint(training_args)
@@ -174,13 +180,10 @@ def dpo_main(
 
 
 def main():
-    parser = TrlParser((ModelArguments, DataArguments, DPOConfig))
-    model_args, data_args, training_args = parser.parse_args_and_config()
-    logger = setup_logging(training_args.get_process_log_level(), logger)
-
-    # Log on each process the small summary:
-    logger.info(f"Model parameters {model_args}")
-    logger.info(f"Training/evaluation parameters {training_args}")
+    parser = TrlParser((ModelConfig, DataArguments, DPOConfig), ignore_extra_args=True)
+    args = parser.parse_args_and_config()
+    print(len(args))
+    model_args, data_args, training_args, _ = parser.parse_args_and_config()
 
     # Set seed for reproducibility
     set_seed(training_args.seed)

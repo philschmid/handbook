@@ -4,7 +4,7 @@
 TODO
 
 ```bash
-./scripts/iterative_dpo/run_iterative_dpo.sh --cofig recipes/iterative_dpo/dev.yaml --output_dir test/iterative_dpo
+./scripts/iterative_dpo/run_iterative_dpo.sh --config recipes/iterative_dpo/dev.yaml
 ```
 
 

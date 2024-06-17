@@ -86,7 +86,7 @@ def vllm_create_candidates(
 
 
 def main():
-    parser = TrlParser((CandidateArguments))
+    parser = TrlParser((CandidateArguments), ignore_extra_args=True)
     script_args = parser.parse_args_and_config()[0]
     script_args = cast(CandidateArguments, script_args)
 

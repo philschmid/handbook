@@ -50,7 +50,7 @@ def create_previous_dataset_path(current_path: str, iteration: int) -> str:
 
 
 def main():
-    parser = TrlParser((PrepareDatasetArguments))
+    parser = TrlParser((PrepareDatasetArguments), ignore_extra_args=True)
     script_args = parser.parse_args_and_config()[0]
 
     # Load Dataset

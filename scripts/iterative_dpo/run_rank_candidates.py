@@ -126,8 +126,9 @@ def rank_candidates_with_seq_model(
 
 
 def main():
-    parser = TrlParser((RankingArguments))
+    parser = TrlParser((RankingArguments), ignore_extra_args=True)
     script_args = parser.parse_args_and_config()[0]
+    print(script_args)
     script_args = cast(RankingArguments, script_args)
 
     # load dataset and tokenizer

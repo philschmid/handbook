@@ -34,15 +34,17 @@ class PrepareDatasetArguments:
 
 
 def main():
-    parser = TrlParser((PrepareDatasetArguments))
+    parser = TrlParser((PrepareDatasetArguments), ignore_extra_args=True)
     script_args = parser.parse_args_and_config()[0]
 
     if script_args.dataset_id_or_path.endswith(".json"):
         dataset = load_dataset(
-            "json", data_files=script_args.input_dataset_path, split="train"
+            "json", data_files=script_args.dataset_id_or_path, split="train"
         )
     else:
-        dataset = load_dataset(script_args.input_dataset_path, split="train")
+        dataset = load_dataset(
+            script_args.dataset_id_or_path, split=script_args.dataset_split
+        )
     # TODO: remove after testing
     dataset = dataset.select(range(300))
     # shuffle and split into even sizes for iterations
