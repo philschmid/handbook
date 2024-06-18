@@ -114,7 +114,7 @@ def dpo_main(
         attn_implementation=model_args.attn_implementation,
         torch_dtype=torch_dtype,
         use_cache=False if training_args.gradient_checkpointing else True,
-        device_map=get_kbit_device_map() if quantization_config is not None else None,
+        device_map=None if quantization_config is None else get_kbit_device_map(),
         quantization_config=quantization_config,
     )
     model = AutoModelForCausalLM.from_pretrained(
@@ -137,7 +137,6 @@ def dpo_main(
         model,
         ref_model=model_ref,
         args=training_args,
-        beta=training_args.beta,
         train_dataset=train_dataset,
         tokenizer=tokenizer,
         max_length=training_args.max_length,
@@ -169,6 +168,8 @@ def dpo_main(
     # Save model and create model card
     ##################################
     logger.info("*** Save model ***")
+    if trainer.is_fsdp_enabled:
+        trainer.accelerator.state.fsdp_plugin.set_state_dict_type("FULL_STATE_DICT")
     # Restore k,v cache for fast inference
     trainer.model.config.use_cache = True
     if model_args.use_peft:

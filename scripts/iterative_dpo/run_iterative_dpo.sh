@@ -85,7 +85,9 @@ for ((i=1; i<=num_iteration; i++)); do
     else
         model_name_or_path=$output_dir/iteration_$(($i-1))
     fi
-    # accelerate launch scripts/iterative_dpo/run_dpo.py --config $config --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json
+    # DS3
+    # ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
+    # ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/multi_gpu.yaml scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
     python scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
     if [ $? -ne 0 ]; then
         echo "Failed to train the model with DPO"
