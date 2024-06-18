@@ -33,7 +33,7 @@ echo "Output directory: $output_dir"
 # 4. Train model with DPO
 # 5. save DPO model and start next iteration
 
-# # Split the data for iteration 
+# Split the data for iteration 
 python scripts/iterative_dpo/run_prepare_dataset.py --config $config
 if [ $? -ne 0 ]; then
   echo "Failed to prepare the dataset"
@@ -42,8 +42,6 @@ fi
 
 # Loop over the num_iterations and add them
 for ((i=1; i<=num_iteration; i++)); do
-    echo "Running iteration $i"
-    i=2
     echo "Running iteration $i"
     ########################
     # 1. Generate Candidates
@@ -54,17 +52,15 @@ for ((i=1; i<=num_iteration; i++)); do
     else
         generation_model_name_or_path=$output_dir/iteration_$(($i-1))
     fi
-
-    # TODO: fix that if its adapter it should use transformers model or merge
     python scripts/iterative_dpo/run_generate_candidates.py --config recipes/iterative_dpo/dev.yaml --generation_model_name_or_path $generation_model_name_or_path --dataset_path $output_dir/iteration_$i/prompts.json
     if [ $? -ne 0 ]; then
         echo "Failed to generate candidates"
         exit 1
     fi
 
-    ########################
-    # 2. Rank Candidates
-    ########################
+    # ########################
+    # # 2. Rank Candidates
+    # ########################
     CUDA_VISIBLE_DEVICES=0 python scripts/iterative_dpo/run_rank_candidates.py --config $config --dataset_path $output_dir/iteration_$i/candidates.json
     if [ $? -ne 0 ]; then
         echo "Failed to rank candidates"
@@ -83,8 +79,14 @@ for ((i=1; i<=num_iteration; i++)); do
     ########################
     # 4. Train model with DPO
     ########################
+    # check if iteration > 1 and overwrite the config file model_name_or_path    
+    if [ $i -eq 1 ]; then
+        model_name_or_path=$(grep -E '^model_name_or_path:.*$' $config  | sed -E 's/^model_name_or_path:[[:space:]]*//' | tr -d '"') 
+    else
+        model_name_or_path=$output_dir/iteration_$(($i-1))
+    fi
     # accelerate launch scripts/iterative_dpo/run_dpo.py --config $config --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json
-    python scripts/iterative_dpo/run_dpo.py --config $config --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json
+    python scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
     if [ $? -ne 0 ]; then
         echo "Failed to train the model with DPO"
         exit 1

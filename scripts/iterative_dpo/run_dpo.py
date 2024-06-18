@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os
 import torch
 from transformers import (
     AutoModelForCausalLM,
@@ -38,10 +39,20 @@ from trl import (
 )
 
 from datasets import load_dataset
-
+from peft import AutoPeftModelForCausalLM
 from alignment.utils import setup_logging
 
 _logger = logging.getLogger(__name__)
+
+
+def merge_peft_model(adapter_dir, save_dir):
+    model = AutoPeftModelForCausalLM.from_pretrained(
+        adapter_dir,
+        low_cpu_mem_usage=True,
+    )
+    print("Merging adapter and base model...")
+    merged_model = model.merge_and_unload()  # merge adapter and base model
+    merged_model.save_pretrained(save_dir, max_shard_size="3GB")
 
 
 def dpo_main(
@@ -158,8 +169,22 @@ def dpo_main(
     # Save model and create model card
     ##################################
     logger.info("*** Save model ***")
-    trainer.save_model(training_args.output_dir)
-    logger.info(f"Model saved to {training_args.output_dir}")
+    # Restore k,v cache for fast inference
+    trainer.model.config.use_cache = True
+    if model_args.use_peft:
+        adapter_dir = os.path.join(training_args.output_dir, "adapter")
+        trainer.model.save_pretrained(adapter_dir)
+        logger.info(f"Adapters saved to {adapter_dir}")
+        logger.info(f"Merging adapter and base model...")
+        if trainer.accelerator.is_main_process:
+            merge_peft_model(adapter_dir, training_args.output_dir)
+        # merge adapter and base model
+    else:
+        trainer.save_model(training_args.output_dir)
+        logger.info(f"Model saved to {training_args.output_dir}")
+
+    tokenizer.save_pretrained(training_args.output_dir)
+    logger.info(f"Tokenizer saved to {training_args.output_dir}")
 
     # Save everything else on main process
     kwargs = {
@@ -168,10 +193,7 @@ def dpo_main(
     }
     if trainer.accelerator.is_main_process:
         trainer.create_model_card(**kwargs)
-        # Restore k,v cache for fast inference
-        if training_args.use_peft is False:
-            trainer.model.config.use_cache = True
-            trainer.model.config.save_pretrained(training_args.output_dir)
+        # merge adapters
 
     if training_args.push_to_hub is True:
         logger.info("Pushing to hub...")
@@ -182,9 +204,10 @@ def dpo_main(
 
 def main():
     parser = TrlParser((ModelConfig, DataArguments, DPOConfig), ignore_extra_args=True)
-    args = parser.parse_args_and_config()
-    print(len(args))
     model_args, data_args, training_args, _ = parser.parse_args_and_config()
+    print(f"Model Args: {model_args}")
+    print(f"Data Args: {data_args}")
+    print(f"Training Args: {training_args}")
 
     # Set seed for reproducibility
     set_seed(training_args.seed)

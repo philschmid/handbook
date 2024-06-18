@@ -65,7 +65,7 @@ def main():
         previous_datasets = []
         percentage = 0.3
         # trying to iteraively load the previous datasets
-        for i in range(script_args.current_iteration - 1, -1, -1):
+        for i in range(script_args.current_iteration - 1, 0, -1):
             print(
                 f"Loading dataset from iteration {i}, but only {percentage} percentage"
             )
