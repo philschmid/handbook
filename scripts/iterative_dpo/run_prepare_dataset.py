@@ -60,7 +60,7 @@ def main():
         it_ds = it_ds.select_columns(["chosen"])  # only keep the chosen column
 
         save_path = os.path.join(
-            script_args.output_dir, f"iteration_{it}", "prompts.json"
+            script_args.output_dir, f"iteration_{it+1}", "prompts.json"
         )
         it_ds.to_json(save_path)
 

@@ -43,6 +43,8 @@ fi
 # Loop over the num_iterations and add them
 for ((i=1; i<=num_iteration; i++)); do
     echo "Running iteration $i"
+    i=2
+    echo "Running iteration $i"
     ########################
     # 1. Generate Candidates
     ########################
@@ -50,9 +52,10 @@ for ((i=1; i<=num_iteration; i++)); do
     if [ $i -eq 1 ]; then
         generation_model_name_or_path=$(grep -E '^model_name_or_path:.*$' $config  | sed -E 's/^model_name_or_path:[[:space:]]*//' | tr -d '"') 
     else
-        generation_model_name_or_path=$output_dir/iteration_$($i-1)
+        generation_model_name_or_path=$output_dir/iteration_$(($i-1))
     fi
 
+    # TODO: fix that if its adapter it should use transformers model or merge
     python scripts/iterative_dpo/run_generate_candidates.py --config recipes/iterative_dpo/dev.yaml --generation_model_name_or_path $generation_model_name_or_path --dataset_path $output_dir/iteration_$i/prompts.json
     if [ $? -ne 0 ]; then
         echo "Failed to generate candidates"

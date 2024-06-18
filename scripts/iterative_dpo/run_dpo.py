@@ -169,8 +169,9 @@ def dpo_main(
     if trainer.accelerator.is_main_process:
         trainer.create_model_card(**kwargs)
         # Restore k,v cache for fast inference
-        trainer.model.config.use_cache = True
-        trainer.model.config.save_pretrained(training_args.output_dir)
+        if training_args.use_peft is False:
+            trainer.model.config.use_cache = True
+            trainer.model.config.save_pretrained(training_args.output_dir)
 
     if training_args.push_to_hub is True:
         logger.info("Pushing to hub...")

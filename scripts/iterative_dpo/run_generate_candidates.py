@@ -11,15 +11,18 @@ from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 from trl import TrlParser
 from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 from datasets import Dataset
 from alignment.configs import CandidateArguments
-
+from peft import LoraConfig, AutoPeftModelForCausalLM
 
 # python scripts/iterative_dpo/run_generate_candidates.py \
 # --generation_model_name_or_path TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
 # --dataset_path test/iterative_dpo/iteration_0/prompts.json
 # config file example
 # python scripts/iterative_dpo/run_generate_candidates.py --config recipes/iterative_dpo/dev.yaml
+
+logger = logging.getLogger(__name__)
 
 
 def validate_dataset(dataset):
@@ -32,6 +35,22 @@ def validate_dataset(dataset):
     dataset = dataset.map(check_last_message)
 
 
+def is_peft_model(path):
+    if os.path.exists(path + "/adapter_config.json"):
+        config = LoraConfig.from_pretrained(path)
+        return config
+
+
+def merge_peft_model(path):
+    model = AutoPeftModelForCausalLM.from_pretrained(
+        path,
+        low_cpu_mem_usage=True,
+    )
+    logger.info("Merging adapter and base model...")
+    merged_model = model.merge_and_unload()  # merge adapter and base model
+    merged_model.save_pretrained(path, max_shard_size="3GB")
+
+
 def vllm_create_candidates(
     dataset: Dataset,
     model_name_or_path: str,
@@ -40,6 +59,10 @@ def vllm_create_candidates(
     batch_size: int = 1,
     **kwargs,
 ) -> Dataset:
+    # check if model_name_or_path is lora
+    if is_peft_model(model_name_or_path):
+        merge_peft_model(model_name_or_path)
+
     llm = LLM(
         model=model_name_or_path,
         tokenizer=model_name_or_path,
@@ -100,6 +123,7 @@ def main():
     print(
         f"Generating {script_args.num_samples} candidates for {len(dataset)} prompts..."
     )
+
     start_time = time.time()
     candidates_ds = vllm_create_candidates(
         dataset,
