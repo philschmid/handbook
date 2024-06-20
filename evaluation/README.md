@@ -61,9 +61,24 @@ You can find more information and access the IFEval leaderboard [here](https://h
 To run evaluation on IFEval, you can use the following command:
 
 ```bash
-accelerate launch evaluation/lighteval/run_lighteval.py \
-    --model_args "pretrained=Qwen/Qwen1.5-0.5B-Chat" \
+accelerate launch lighteval/run_lighteval.py \
+    --model_args "pretrained=TinyLlama/TinyLlama-1.1B-Chat-v1.0" \
     --use_chat_template \
     --tasks "extended|ifeval|0|0" \
     --override_batch_size 8
+```
+
+Should lead to 
+
+```bash
+| Task              | Version | Metric                  |  Value |     | Stderr |
+| ----------------- | ------: | ----------------------- | -----: | --- | -----: |
+| all               |         | prompt_level_strict_acc | 0.1275 | ±   | 0.0144 |
+|                   |         | inst_level_strict_acc   | 0.2242 | ±   | 0.0005 |
+|                   |         | prompt_level_loose_acc  | 0.1460 | ±   | 0.0152 |
+|                   |         | inst_level_loose_acc    | 0.2518 | ±   | 0.0005 |
+| extended:ifeval:0 |       0 | prompt_level_strict_acc | 0.1275 | ±   | 0.0144 |
+|                   |         | inst_level_strict_acc   | 0.2242 | ±   | 0.0005 |
+|                   |         | prompt_level_loose_acc  | 0.1460 | ±   | 0.0152 |
+|                   |         | inst_level_loose_acc    | 0.2518 | ±   | 0.0005 |
 ```

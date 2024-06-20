@@ -7,10 +7,6 @@ import argparse
 import os
 from lighteval.main_accelerate import CACHE_DIR, main
 
-# get directory from the file
-
-dir_path = os.path.dirname(os.path.realpath(__file__))
-
 
 def get_parser():
     parser = argparse.ArgumentParser()
@@ -75,7 +71,6 @@ if __name__ == "__main__":
 
     if args.output_dir is None:
         model_id = args.model_args.split("=")[1].replace("/", "_")
-        print(model_id)
-        args.output_dir = os.path.join(dir_path, "results", model_id)
+        args.output_dir = os.path.join(os.getcwd(), "results", model_id)
 
-    # main(args)
+    main(args)
