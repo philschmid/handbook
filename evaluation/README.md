@@ -42,14 +42,10 @@ accelerate launch lighteval/run_lighteval.py \
 ```
 
 Should lead to 
-```bash
 | Task              | Version | Metric      |  Value |     | Stderr |
 | ----------------- | ------: | ----------- | -----: | --- | -----: |
-| all               |         | single_turn | 4.4313 | ±   | 0.3695 |
-|                   |         | multi_turn  | 3.2500 | ±   | 0.3022 |
 | custom:mt_bench:0 |       0 | single_turn | 4.4313 | ±   | 0.3695 |
 |                   |         | multi_turn  | 3.2500 | ±   | 0.3022 |
-```
 
 
 ### IFEval
@@ -70,15 +66,9 @@ accelerate launch lighteval/run_lighteval.py \
 
 Should lead to 
 
-```bash
 | Task              | Version | Metric                  |  Value |     | Stderr |
 | ----------------- | ------: | ----------------------- | -----: | --- | -----: |
-| all               |         | prompt_level_strict_acc | 0.1275 | ±   | 0.0144 |
-|                   |         | inst_level_strict_acc   | 0.2242 | ±   | 0.0005 |
-|                   |         | prompt_level_loose_acc  | 0.1460 | ±   | 0.0152 |
-|                   |         | inst_level_loose_acc    | 0.2518 | ±   | 0.0005 |
 | extended:ifeval:0 |       0 | prompt_level_strict_acc | 0.1275 | ±   | 0.0144 |
 |                   |         | inst_level_strict_acc   | 0.2242 | ±   | 0.0005 |
 |                   |         | prompt_level_loose_acc  | 0.1460 | ±   | 0.0152 |
 |                   |         | inst_level_loose_acc    | 0.2518 | ±   | 0.0005 |
-```
