@@ -163,3 +163,4 @@ cython_debug/
 data/
 wandb/
 test/
+evaluation/lighteval/results/
