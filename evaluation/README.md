@@ -34,11 +34,11 @@ To run evaluation on MT-Bench, you can use the following command:
 ```bash
 export OPENAI_API_KEY=YOUR_OPENAI_API_KEY
 accelerate launch lighteval/run_lighteval.py \
-    --model_args "pretrained=Qwen/Qwen1.5-0.5B-Chat" \
+    --model_args "pretrained=/home/ubuntu/alignment-handbook/test/iterative_dpo/iteration_3" \
     --tasks "custom|mt_bench|0|0" \
     --custom_tasks "lighteval/custom_tasks/mt_bench.py"  \
     --use_chat_template \
-    --override_batch_size 16
+    --override_batch_size 8
 ```
 
 Should lead to 
@@ -64,11 +64,21 @@ accelerate launch lighteval/run_lighteval.py \
     --override_batch_size 8
 ```
 
+local path
+```bash
+accelerate launch lighteval/run_lighteval.py \
+    --model_args "pretrained=/home/ubuntu/alignment-handbook/test/iterative_dpo/iteration_3" \
+    --use_chat_template \
+    --tasks "extended|ifeval|0|0" \
+    --override_batch_size 8
+```
+
+
 Should lead to 
 
 | Task              | Version | Metric                  |  Value |     | Stderr |
 | ----------------- | ------: | ----------------------- | -----: | --- | -----: |
-| extended:ifeval:0 |       0 | prompt_level_strict_acc | 0.1275 | ±   | 0.0144 |
-|                   |         | inst_level_strict_acc   | 0.2242 | ±   | 0.0005 |
-|                   |         | prompt_level_loose_acc  | 0.1460 | ±   | 0.0152 |
-|                   |         | inst_level_loose_acc    | 0.2518 | ±   | 0.0005 |
+| extended:ifeval:0 |       0 | prompt_level_strict_acc | 0.1312 | ±   | 0.0145 |
+|                   |         | inst_level_strict_acc   | 0.2302 | ±   | 0.0004 |
+|                   |         | prompt_level_loose_acc  | 0.1516 | ±   | 0.0154 |
+|                   |         | inst_level_loose_acc    | 0.2554 | ±   | 0.0004 |
