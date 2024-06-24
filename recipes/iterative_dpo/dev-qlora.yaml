@@ -1,7 +1,8 @@
 num_iterations: 3
 output_dir: test/iterative_dpo
 # Model arguments
-model_name_or_path: alignment-handbook/zephyr-7b-sft-full
+# model_name_or_path: alignment-handbook/zephyr-7b-sft-qlora
+model_name_or_path:  "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 torch_dtype: bfloat16
 attn_implementation: "flash_attention_2"
 
@@ -11,31 +12,36 @@ train_split: "train_prefs"
 
 # Candiate Generation arguments
 num_samples: 5
-batch_size: 128 # 8x H100 80GB
+batch_size: 16
 
 # Ranking arguments
 rank_model_name_or_path: RLHFlow/ArmoRM-Llama3-8B-v0.1
 rank_trust_remote_code: true
 
 # LoRA arguments
-use_peft: false
+use_peft: true
+load_in_4bit: true
+lora_r: 16
+lora_alpha: 8
+lora_dropout: 0.05
+lora_target_modules: "all-linear"
 
 # DPOTrainer arguments
 bf16: true
 beta: 0.01
 eval_strategy: "no"
-gradient_accumulation_steps: 2
+gradient_accumulation_steps: 1
 gradient_checkpointing: true
-learning_rate: 5.0e-7
-warmup_ratio: 0.03
+learning_rate: 5.0e-6
 log_level: info
 logging_steps: 10
 lr_scheduler_type: cosine
 max_length: 1024
 max_prompt_length: 512
-optim: adamw_torch
-per_device_train_batch_size: 4
+optim: paged_adamw_32bit
+per_device_train_batch_size: 1
 save_strategy: "steps"
 save_steps: 100
 save_total_limit: 1
 seed: 42
+warmup_ratio: 0.1

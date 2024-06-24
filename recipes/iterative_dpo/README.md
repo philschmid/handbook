@@ -7,6 +7,12 @@ TODO
 ./scripts/iterative_dpo/run_iterative_dpo.sh --config recipes/iterative_dpo/dev.yaml
 ```
 
+## Slurm
+
+```bash
+sbatch --job-name=interative_dpo_test_2 --nodes=1 recipes/iterative_dpo/launch.slurm recipes/iterative_dpo/dev.yaml
+```
+
 
 ## Full training examples
 
@@ -22,10 +28,31 @@ ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_con
 ## QLoRA training examples
 
 Train faster with flash-attention 2 (GPU supporting FA2: A100, H100, etc)
-```````shell
+```shell
 # Step 1 - SFT
-ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/multi_gpu.yaml --num_processes=1 scripts/run_sft.py recipes/zephyr-7b-beta/sft/config_qlora.yaml --load_in_4bit=true
+ACCELERATE_LOG_LEVEL=info ./scripts/iterative_dpo/run_iterative_dpo.sh --config recipes/iterative_dpo/dev-qlora.yaml
+```
 
-# Step 2 - DPO
-ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/multi_gpu.yaml --num_processes=1 scripts/run_dpo.py recipes/zephyr-7b-beta/dpo/config_qlora.yaml
-```````
+
+
+accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml scripts/iterative_dpo/run_dpo.py --config recipes/iterative_dpo/dev.yaml --model_name_or_path alignment-handbook/zephyr-7b-sft-full --output_dir test/iterative_dpo/iteration_1  --dataset_id_or_path test/iterative_dpo/iteration_1/pairwise.json --num_train_epochs 1
+
+
+# Results 15k data
+
+| Iteration/SFT                                                                                             | Single Turn | Multi Turn | Mean   |
+| --------------------------------------------------------------------------------------------------------- | ----------- | ---------- | ------ |
+| SFT [alignment-handbook/zephyr-7b-sft-full](https://huggingface.co/alignment-handbook/zephyr-7b-sft-full) | 6.7000      | 5.8375     | 6.2688 |
+| Online DPO (Iteration 1)                                                                                  | 6.8875      | 6.5250     | 6.7063 |
+| Online DPO (Iteration 2)                                                                                  | 6.0563      | 5.1875     | 5.6219 |
+| Online DPO (Iteration 3)                                                                                  | 7.0187      | 5.8250     | 6.4219 |
+
+# Results full
+
+| Iteration/SFT                                                                                             | Single Turn | Multi Turn | Mean |
+| --------------------------------------------------------------------------------------------------------- | ----------- | ---------- | ---- |
+| SFT [alignment-handbook/zephyr-7b-sft-full](https://huggingface.co/alignment-handbook/zephyr-7b-sft-full) | 6.7000      | 5.8375     | 6.27 |
+| Offline DPO                                                                                               | 7.5438      | 7.0625     | 7.30 |
+| Online DPO (Iteration 1)                                                                                  | 7.0875      | 6.4750     | 6.78 |
+| Online DPO (Iteration 2)                                                                                  | 7.212       | 5.7875     | 6.5  |
+| Online DPO (Iteration 3)                                                                                  | 6.8438      | 4.9625     | 5.85 |

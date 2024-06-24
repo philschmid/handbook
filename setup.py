@@ -71,6 +71,7 @@ _deps = [
     "tqdm>=4.64.1",
     # iterative dpo
     "vllm"
+    # flash-attn
 ]
 
 # this is a lookup table with items like:

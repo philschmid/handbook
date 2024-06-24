@@ -23,6 +23,7 @@ class PrepareDatasetArguments:
 def create_pairwise_dpo_dataset(dataset: Dataset) -> Dataset:
     def create_pair(s):
         """Create a pairwise dataset from the two best scores from the candidates and the original message."""
+        # TODO: different strategies for selecting the pairs https://github.com/RLHFlow/Online-RLHF/blob/01dd0c1657c5623389cbf9f0152babde0965ba82/dpo_iteration/run_dpo.py#L133
         arr = [s["original"]] + s["candidates"]
         tensor = torch.tensor([s["score"] for s in arr])
         _, top2_indices = torch.topk(tensor, 2)

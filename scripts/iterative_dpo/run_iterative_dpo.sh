@@ -20,8 +20,10 @@ fi
 # Extract the num_iteration value from the config file
 num_iteration=$(awk -F: '/num_iteration/ {gsub(/ /, "", $2); print $2}' "$config")
 output_dir=$(awk -F: '/output_dir/ {gsub(/ /, "", $2); print $2}' "$config")
+num_gpus=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
 echo "Running $num_iteration iterations"
 echo "Output directory: $output_dir"
+echo "Number of GPUs: $num_gpus"
 
 ###########################
 # Start Iterative DPO Loop
@@ -58,9 +60,9 @@ for ((i=1; i<=num_iteration; i++)); do
         exit 1
     fi
 
-    # ########################
-    # # 2. Rank Candidates
-    # ########################
+    #########################
+    # 2. Rank Candidates
+    #########################
     CUDA_VISIBLE_DEVICES=0 python scripts/iterative_dpo/run_rank_candidates.py --config $config --dataset_path $output_dir/iteration_$i/candidates.json
     if [ $? -ne 0 ]; then
         echo "Failed to rank candidates"
@@ -86,9 +88,9 @@ for ((i=1; i<=num_iteration; i++)); do
         model_name_or_path=$output_dir/iteration_$(($i-1))
     fi
     # DS3
-    # ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
+    ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml --num_processes $num_gpus scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
     # ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/multi_gpu.yaml scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
-    python scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
+    # python scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
     if [ $? -ne 0 ]; then
         echo "Failed to train the model with DPO"
         exit 1

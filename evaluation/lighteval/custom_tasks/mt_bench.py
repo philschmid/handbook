@@ -44,7 +44,7 @@ task = LightevalTaskConfig(
     few_shots_split="",
     few_shots_select="random",
     metric=["gpt4_judge"],
-    generation_size=2000,
+    generation_size=1024,
     stop_sequence=[],
 )
 

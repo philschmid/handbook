@@ -1,26 +1,14 @@
-num_iterations: 3
-output_dir: test/iterative_dpo
+output_dir: test/offline_dpo
 # Model arguments
 model_name_or_path: alignment-handbook/zephyr-7b-sft-full
 torch_dtype: bfloat16
 attn_implementation: "flash_attention_2"
-
-# Dataset 
-dataset_id_or_path:  "HuggingFaceH4/ultrafeedback_binarized"
-train_split: "train_prefs"
-
-# Candiate Generation arguments
-num_samples: 5
-batch_size: 128 # 8x H100 80GB
-
-# Ranking arguments
-rank_model_name_or_path: RLHFlow/ArmoRM-Llama3-8B-v0.1
-rank_trust_remote_code: true
-
+dataset_id_or_path: HuggingFaceH4/ultrafeedback_binarized
 # LoRA arguments
 use_peft: false
 
 # DPOTrainer arguments
+num_train_epochs: 1
 bf16: true
 beta: 0.01
 eval_strategy: "no"

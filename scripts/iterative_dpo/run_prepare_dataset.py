@@ -45,8 +45,6 @@ def main():
         dataset = load_dataset(
             script_args.dataset_id_or_path, split=script_args.dataset_split
         )
-    # TODO: remove after testing
-    dataset = dataset.select(range(9000))
     # shuffle and split into even sizes for iterations
     dataset = dataset.shuffle(seed=42)
     iteration_length = len(dataset) // script_args.num_iterations

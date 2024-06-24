@@ -16,7 +16,7 @@ _Note: LightEval is not yet available on PyPI, so you need to install it from th
 
 ```bash
 # pip install git+https://github.com/huggingface/lighteval.git langdetect openai
-pip install git+https://github.com/huggingface/lighteval@add-gpt-4-judge langdetect openai
+pip install git+https://github.com/huggingface/lighteval@add-gpt-4-judge langdetect openai --upgrade
 ```
 
 ### MT-Bench
@@ -34,7 +34,7 @@ To run evaluation on MT-Bench, you can use the following command:
 ```bash
 export OPENAI_API_KEY=YOUR_OPENAI_API_KEY
 accelerate launch lighteval/run_lighteval.py \
-    --model_args "pretrained=/home/ubuntu/alignment-handbook/test/iterative_dpo/iteration_3" \
+    --model_args "pretrained=/fsx/philipp/alignment-handbook/test/iterative_dpo/iteration_3" \
     --tasks "custom|mt_bench|0|0" \
     --custom_tasks "lighteval/custom_tasks/mt_bench.py"  \
     --use_chat_template \
