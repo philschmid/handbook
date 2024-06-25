@@ -3,7 +3,9 @@ output_dir: test/offline_dpo
 model_name_or_path: alignment-handbook/zephyr-7b-sft-full
 torch_dtype: bfloat16
 attn_implementation: "flash_attention_2"
-dataset_id_or_path: HuggingFaceH4/ultrafeedback_binarized
+# Dataset 
+dataset_id_or_path:  "HuggingFaceH4/ultrafeedback_binarized"
+dataset_splits: "train_prefs"
 # LoRA arguments
 use_peft: false
 

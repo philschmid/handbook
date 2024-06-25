@@ -34,12 +34,20 @@ To run evaluation on MT-Bench, you can use the following command:
 ```bash
 export OPENAI_API_KEY=YOUR_OPENAI_API_KEY
 accelerate launch lighteval/run_lighteval.py \
-    --model_args "pretrained=/fsx/philipp/alignment-handbook/test/iterative_dpo/iteration_3" \
+    --model_args "pretrained=/fsx/philipp/alignment-handbook/test/offline_dpo" \
     --tasks "custom|mt_bench|0|0" \
     --custom_tasks "lighteval/custom_tasks/mt_bench.py"  \
     --use_chat_template \
     --override_batch_size 8
 ```
+
+**slurm**
+
+```bash
+# > pwd: handbook
+sbatch --job-name=mt_bench --nodes=1 evaluation/slurm/mt_bench.slurm /fsx/philipp/alignment-handbook/test/offline_dpo
+```
+
 
 Should lead to 
 | Task              | Version | Metric      |  Value |     | Stderr |

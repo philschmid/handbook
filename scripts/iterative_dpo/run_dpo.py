@@ -67,9 +67,14 @@ def dpo_main(
     ###############
     # Load datasets
     ###############
-    train_dataset = load_dataset(
-        "json", data_files=data_args.dataset_id_or_path, split="train"
-    )
+    if data_args.dataset_id_or_path.endswith(".json"):
+        train_dataset = load_dataset(
+            "json", data_files=data_args.dataset_id_or_path, split="train"
+        )
+    else:
+        train_dataset = load_dataset(
+            data_args.dataset_id_or_path, split=data_args.dataset_splits
+        )
 
     #####################################
     # Load tokenizer and process datasets
