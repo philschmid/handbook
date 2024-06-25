@@ -14,10 +14,10 @@ num_train_epochs: 1
 bf16: true
 beta: 0.01
 eval_strategy: "no"
-gradient_accumulation_steps: 2
+gradient_accumulation_steps: 4
 gradient_checkpointing: true
 learning_rate: 5.0e-7
-warmup_ratio: 0.03
+warmup_ratio: 0.1
 log_level: info
 logging_steps: 10
 lr_scheduler_type: cosine

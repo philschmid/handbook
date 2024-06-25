@@ -52,7 +52,8 @@ accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml 
 | Iteration/SFT                                                                                             | Single Turn | Multi Turn | Mean |
 | --------------------------------------------------------------------------------------------------------- | ----------- | ---------- | ---- |
 | SFT [alignment-handbook/zephyr-7b-sft-full](https://huggingface.co/alignment-handbook/zephyr-7b-sft-full) | 6.7000      | 5.8375     | 6.27 |
-| Offline DPO                                                                                               | 7.5438      | 7.0625     | 7.30 |
+| Offline DPO [alignment-handbook/zephyr-7b-dpo-full](https://huggingface.co/alignment-handbook/zephyr-7b-dpo-full)                                                                                                | 7.5438      | 7.0625     | 7.30 |
+| Offline DPO trained                                                                                       | 7.1375      | 7.0125     | 7.08 |
 | Online DPO (Iteration 1)                                                                                  | 7.0875      | 6.4750     | 6.78 |
 | Online DPO (Iteration 2)                                                                                  | 7.212       | 5.7875     | 6.5  |
 | Online DPO (Iteration 3)                                                                                  | 6.8438      | 4.9625     | 5.85 |
