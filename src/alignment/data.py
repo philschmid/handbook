@@ -15,8 +15,16 @@
 
 import os
 from typing import Any, List, Literal, Optional
+import torch
 
-from datasets import DatasetDict, concatenate_datasets, load_dataset, load_from_disk
+
+from datasets import (
+    DatasetDict,
+    concatenate_datasets,
+    load_dataset,
+    load_from_disk,
+    Dataset,
+)
 from datasets.builder import DatasetGenerationError
 
 from .configs import DataArguments
@@ -271,3 +279,44 @@ def mix_datasets(
         )
 
     return raw_datasets
+
+
+def create_pairwise_dpo_dataset(dataset: Dataset, choose_type="max_min") -> Dataset:
+    """
+    Create a pairwise dataset from the two best scores from the candidates and the original message.
+    Args:
+        dataset: the dataset to create the pairs from
+        choose_type: the strategy to choose the pairs, one of "random", "max_random", "max_min", "max_max"
+    Returns:
+        a new dataset with the pairs and coloumns "chosen" and "rejected"
+    """
+
+    def create_pair(s):
+
+        arr = [s["original"]] + s["candidates"]
+        tensor = torch.tensor([s["score"] for s in arr])
+
+        if choose_type == "random":
+            idx0 = torch.randint(0, len(tensor), (1,))
+            idx1 = torch.randint(0, len(tensor), (1,))
+            if idx0 == idx1:
+                idx1 = (idx0 + 1) % len(tensor)
+        elif choose_type == "max_random":
+            idx0 = torch.argmax(tensor)
+            idx1 = torch.randint(0, len(tensor), (1,))
+        elif choose_type == "max_min":
+            idx0 = torch.argmax(tensor)
+            idx1 = torch.argmin(tensor)
+        elif choose_type == "max_max":
+            _, top2_indices = torch.topk(tensor, 2)
+            idx0 = top2_indices[0]
+            idx1 = top2_indices[1]
+        else:
+            raise NotImplementedError
+
+        return {
+            "chosen": arr[idx0]["messages"],
+            "rejected": arr[idx1]["messages"],
+        }
+
+    return dataset.map(create_pair, remove_columns=dataset.features)

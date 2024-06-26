@@ -17,10 +17,17 @@ from copy import deepcopy
 
 import pytest
 from datasets import Dataset
+import torch
 from transformers import AutoTokenizer
 
-from alignment import DataArguments, ModelArguments, apply_chat_template, get_datasets, get_tokenizer
-from alignment.data import maybe_insert_system_message
+from alignment import (
+    DataArguments,
+    ModelArguments,
+    apply_chat_template,
+    get_datasets,
+    get_tokenizer,
+)
+from alignment.data import maybe_insert_system_message, create_pairwise_dpo_dataset
 
 
 class GetDatasetsTest(unittest.TestCase):
@@ -78,7 +85,9 @@ class GetDatasetsTest(unittest.TestCase):
         dataset_mixer = {
             "HuggingFaceH4/testing_alpaca_small": 1.0,
         }
-        datasets = get_datasets(dataset_mixer, splits=["test"], columns_to_keep=["prompt", "completion"])
+        datasets = get_datasets(
+            dataset_mixer, splits=["test"], columns_to_keep=["prompt", "completion"]
+        )
         self.assertEqual(len(datasets["test"]), 100)
         self.assertRaises(KeyError, lambda: datasets["train"])
 
@@ -123,11 +132,16 @@ class ApplyChatTemplateTest(unittest.TestCase):
 
     def test_maybe_insert_system_message(self):
         # does not accept system prompt
-        mistral_tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.2")
+        mistral_tokenizer = AutoTokenizer.from_pretrained(
+            "mistralai/Mistral-7B-Instruct-v0.2"
+        )
         # accepts system prompt. use codellama since it has no HF token reqiurement
         llama_tokenizer = AutoTokenizer.from_pretrained("codellama/CodeLlama-7b-hf")
         messages_sys_excl = [{"role": "user", "content": "Tell me a joke."}]
-        messages_sys_incl = [{"role": "system", "content": ""}, {"role": "user", "content": "Tell me a joke."}]
+        messages_sys_incl = [
+            {"role": "system", "content": ""},
+            {"role": "user", "content": "Tell me a joke."},
+        ]
 
         mistral_messages = deepcopy(messages_sys_excl)
         llama_messages = deepcopy(messages_sys_excl)
@@ -194,3 +208,65 @@ class ApplyChatTemplateTest(unittest.TestCase):
                 "text_rejected": "<|assistant|>\nNot so good tbh</s>\n",
             },
         )
+
+
+class CreatePairwiseDPODatasetTest(unittest.TestCase):
+    """Test cases for create_pairwise_dpo_dataset function"""
+
+    def setUp(self):
+        self.sample_dataset = Dataset.from_dict(
+            {
+                "original": [
+                    {"messages": "Original message 1", "score": 0.5},
+                    {"messages": "Original message 2", "score": 0.3},
+                ],
+                "candidates": [
+                    [
+                        {"messages": "Candidate 1-1", "score": 0.8},
+                        {"messages": "Candidate 1-2", "score": 0.2},
+                        {"messages": "Candidate 1-3", "score": 0.6},
+                    ],
+                    [
+                        {"messages": "Candidate 2-1", "score": 0.7},
+                        {"messages": "Candidate 2-2", "score": 0.1},
+                        {"messages": "Candidate 2-3", "score": 0.9},
+                    ],
+                ],
+            }
+        )
+
+    def test_max_min_strategy(self):
+        result = create_pairwise_dpo_dataset(self.sample_dataset, choose_type="max_min")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["chosen"], "Candidate 1-1")
+        self.assertEqual(result[0]["rejected"], "Candidate 1-2")
+        self.assertEqual(result[1]["chosen"], "Candidate 2-3")
+        self.assertEqual(result[1]["rejected"], "Candidate 2-2")
+
+    def test_max_max_strategy(self):
+        result = create_pairwise_dpo_dataset(self.sample_dataset, choose_type="max_max")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["chosen"], "Candidate 1-1")
+        self.assertEqual(result[0]["rejected"], "Candidate 1-3")
+        self.assertEqual(result[1]["chosen"], "Candidate 2-3")
+        self.assertEqual(result[1]["rejected"], "Candidate 2-1")
+
+    def test_max_random_strategy(self):
+        torch.manual_seed(42)  # Set seed for reproducibility
+        result = create_pairwise_dpo_dataset(
+            self.sample_dataset, choose_type="max_random"
+        )
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["chosen"], "Candidate 1-1")
+        self.assertEqual(result[1]["chosen"], "Candidate 2-3")
+        # Note: We can't assert the 'rejected' values as they are random
+
+    def test_random_strategy(self):
+        torch.manual_seed(42)  # Set seed for reproducibility
+        result = create_pairwise_dpo_dataset(self.sample_dataset, choose_type="random")
+        self.assertEqual(len(result), 2)
+        # Note: We can't assert specific values as they are random
+
+    def test_invalid_choose_type(self):
+        with self.assertRaises(NotImplementedError):
+            create_pairwise_dpo_dataset(self.sample_dataset, choose_type="invalid_type")

@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import os
 from datasets import load_dataset, Dataset, concatenate_datasets
 from trl import TrlParser
+from alignment.data import create_pairwise_dpo_dataset
 
 # cli args
 # python scripts/iterative_dpo/run_prepare_pairwise_dataset.py \
@@ -18,22 +19,12 @@ class PrepareDatasetArguments:
     current_iteration: int = field(
         metadata={"help": "The current iteration number"}, default=0
     )
-
-
-def create_pairwise_dpo_dataset(dataset: Dataset) -> Dataset:
-    def create_pair(s):
-        """Create a pairwise dataset from the two best scores from the candidates and the original message."""
-        # TODO: different strategies for selecting the pairs https://github.com/RLHFlow/Online-RLHF/blob/01dd0c1657c5623389cbf9f0152babde0965ba82/dpo_iteration/run_dpo.py#L133
-        arr = [s["original"]] + s["candidates"]
-        tensor = torch.tensor([s["score"] for s in arr])
-        _, top2_indices = torch.topk(tensor, 2)
-        top2_indices.tolist()
-        return {
-            "chosen": arr[top2_indices[0]]["messages"],
-            "rejected": arr[top2_indices[1]]["messages"],
-        }
-
-    return dataset.map(create_pair, remove_columns=dataset.features)
+    pair_strategy: str = field(
+        metadata={
+            "help": 'The strategy to create the pairwise dataset, one of "random", "max_random", "max_min", "max_max"'
+        },
+        default="max_min",
+    )
 
 
 def create_previous_dataset_path(current_path: str, iteration: int) -> str:
@@ -94,7 +85,9 @@ def main():
         )
 
     # Create pairwise dataset with the best two scores
-    pairwise_ds = create_pairwise_dpo_dataset(dataset)
+    pairwise_ds = create_pairwise_dpo_dataset(
+        dataset, choose_type=script_args.pair_strategy
+    )
     # save the pairwise dataset
     save_dir = os.path.dirname(script_args.dataset_path)
     pairwise_ds.to_json(os.path.join(save_dir, "pairwise.json"))
