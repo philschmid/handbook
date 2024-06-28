@@ -1,4 +1,4 @@
-output_dir: test/offline_dpo
+output_dir: test/offline_dpo-2
 # Model arguments
 model_name_or_path: alignment-handbook/zephyr-7b-sft-full
 torch_dtype: bfloat16
@@ -17,12 +17,12 @@ eval_strategy: "no"
 gradient_accumulation_steps: 4
 gradient_checkpointing: true
 learning_rate: 5.0e-7
-warmup_ratio: 0.1
+lr_scheduler_type: cosine
+warmup_ratio: 0.03 
 log_level: info
 logging_steps: 10
-lr_scheduler_type: cosine
-max_length: 1024
-max_prompt_length: 512
+max_length: 1536
+max_prompt_length: 768
 optim: adamw_torch
 per_device_train_batch_size: 4
 save_strategy: "steps"

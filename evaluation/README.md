@@ -45,7 +45,7 @@ accelerate launch lighteval/run_lighteval.py \
 
 ```bash
 # > pwd: handbook
-sbatch --job-name=mt_bench --nodes=1 evaluation/slurm/mt_bench.slurm /fsx/philipp/alignment-handbook/test/offline_dpo
+sbatch --job-name=mt_bench --nodes=1 evaluation/slurm/mt_bench.slurm /fsx/philipp/alignment-handbook/test/offline_dpo-2
 ```
 
 
@@ -90,3 +90,88 @@ Should lead to
 |                   |         | inst_level_strict_acc   | 0.2302 | ±   | 0.0004 |
 |                   |         | prompt_level_loose_acc  | 0.1516 | ±   | 0.0154 |
 |                   |         | inst_level_loose_acc    | 0.2554 | ±   | 0.0004 |
+
+
+
+### MixEval 
+
+[MixEval](https://github.com/Psycoy/MixEval/) is a A dynamic benchmark evaluating LLMs using real-world user queries and benchmarks, achieving a 0.96 model ranking correlation with Chatbot Arena and costs around $0.6 to run using GPT-3.5 as a Judge.
+
+You can find more information and access the MixEval leaderboard [here](https://mixeval.github.io/#leaderboard).
+
+```bash
+# Fork with more losely dependencies
+pip install git+https://github.com/philschmid/MixEval --upgrade
+```
+
+_Note: If you want to evaluate models that are not included Take a look [here](https://github.com/philschmid/MixEval?tab=readme-ov-file#registering-new-models). Zephyr example [here](https://github.com/philschmid/MixEval/blob/main/mix_eval/models/zephyr_7b_beta.py)._
+
+
+**Remote Hugging Face model with existing config:**
+
+```bash
+# MODEL_PARSER_API=<your openai api key
+MODEL_PARSER_API=$(echo $OPENAI_API_KEY) python -m mix_eval.evaluate \
+    --data_path hf://zeitgeist-ai/mixeval \
+    --model_name zephyr_7b_beta \
+    --benchmark mixeval_hard \
+    --version 2024-06-01 \
+    --batch_size 20 \
+    --output_dir results \
+    --api_parallel_num 20
+```
+
+**Using vLLM/TGI with hosted or local API:**
+
+1. start you environment
+```bash
+python -m vllm.entrypoints.openai.api_server --model alignment-handbook/zephyr-7b-dpo-full
+```
+
+2. run the following command
+
+```bash
+MODEL_PARSER_API=$(echo $OPENAI_API_KEY) API_URL=http://localhost:8000/v1 python -m mix_eval.evaluate \
+    --data_path hf://zeitgeist-ai/mixeval \
+    --model_name local_api \
+    --model_path alignment-handbook/zephyr-7b-dpo-full \
+    --benchmark mixeval_hard \
+    --version 2024-06-01 \
+    --batch_size 20 \
+    --output_dir results \
+    --api_parallel_num 20
+```
+
+Takes around 5 minutes to evaluate.
+
+**Local Hugging Face model from path:**
+
+```bash
+# MODEL_PARSER_API=<your openai api key>
+MODEL_PARSER_API=$(echo $OPENAI_API_KEY) python -m mix_eval.evaluate \
+    --data_path hf://zeitgeist-ai/mixeval \
+    --model_path my/local/path \
+    --output_dir results/agi-5 \
+    --model_name local_chat \
+    --benchmark mixeval_hard \
+    --version 2024-06-01 \
+    --batch_size 20 \
+    --api_parallel_num 20
+```
+
+**Remote Hugging Face model without config and defaults**
+
+_Note: We use the model name `local_chat` to avoid the need for a config file and load it from the Hugging Face model hub._
+
+```bash
+# MODEL_PARSER_API=<your openai api key>
+MODEL_PARSER_API=$(echo $OPENAI_API_KEY) python -m mix_eval.evaluate \
+    --data_path hf://zeitgeist-ai/mixeval \
+    --model_path alignment-handbook/zephyr-7b-sft-full \
+    --output_dir results/handbook-zephyr \
+    --model_name local_chat \
+    --benchmark mixeval_hard \
+    --version 2024-06-01 \
+    --batch_size 20 \
+    --api_parallel_num 20
+```

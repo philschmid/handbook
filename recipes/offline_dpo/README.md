@@ -12,7 +12,7 @@ ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_con
 
 ```bash
 # > pwd: handbook
-sbatch --job-name=offline_dpo_test_3 --nodes=1 recipes/offline_dpo/launch.slurm recipes/offline_dpo/dev.yaml
+sbatch --job-name=offline_dpo_test_5 --nodes=1 recipes/offline_dpo/launch.slurm recipes/offline_dpo/dev.yaml
 ```
 
 
