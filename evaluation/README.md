@@ -45,7 +45,7 @@ accelerate launch lighteval/run_lighteval.py \
 
 ```bash
 # > pwd: handbook
-sbatch --job-name=mt_bench --nodes=1 evaluation/slurm/mt_bench.slurm /fsx/philipp/alignment-handbook/test/offline_dpo-2
+sbatch --job-name=mt_bench --nodes=1 evaluation/slurm/mt_bench.slurm /fsx/philipp/alignment-handbook/test/iterative_dpo/iteration_3
 ```
 
 
@@ -75,7 +75,7 @@ accelerate launch lighteval/run_lighteval.py \
 local path
 ```bash
 accelerate launch lighteval/run_lighteval.py \
-    --model_args "pretrained=/home/ubuntu/alignment-handbook/test/iterative_dpo/iteration_3" \
+    --model_args "pretrained=/home/ubuntu/alignment-handbook/test/iterative_dpo/iteration_1" \
     --use_chat_template \
     --tasks "extended|ifeval|0|0" \
     --override_batch_size 8
@@ -126,6 +126,7 @@ MODEL_PARSER_API=$(echo $OPENAI_API_KEY) python -m mix_eval.evaluate \
 1. start you environment
 ```bash
 python -m vllm.entrypoints.openai.api_server --model alignment-handbook/zephyr-7b-dpo-full
+python -m vllm.entrypoints.openai.api_server --model /fsx/philipp/alignment-handbook/test/iterative_dpo/iteration_3
 ```
 
 2. run the following command
@@ -134,11 +135,11 @@ python -m vllm.entrypoints.openai.api_server --model alignment-handbook/zephyr-7
 MODEL_PARSER_API=$(echo $OPENAI_API_KEY) API_URL=http://localhost:8000/v1 python -m mix_eval.evaluate \
     --data_path hf://zeitgeist-ai/mixeval \
     --model_name local_api \
-    --model_path alignment-handbook/zephyr-7b-dpo-full \
+    --model_path /fsx/philipp/alignment-handbook/test/iterative_dpo/iteration_3 \
     --benchmark mixeval_hard \
     --version 2024-06-01 \
     --batch_size 20 \
-    --output_dir results \
+    --output_dir results/it3 \
     --api_parallel_num 20
 ```
 
