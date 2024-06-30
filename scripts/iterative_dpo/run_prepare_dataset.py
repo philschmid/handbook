@@ -45,8 +45,12 @@ def main():
         dataset = load_dataset(
             script_args.dataset_id_or_path, split=script_args.dataset_split
         )
+
     # shuffle and split into even sizes for iterations
     dataset = dataset.shuffle(seed=42)
+    # Debug
+    dataset = dataset.select(range(30_000))
+
     iteration_length = len(dataset) // script_args.num_iterations
     print(f"Total Dataset Size: {len(dataset)}")
     print(f"Iteration Length: {iteration_length}")

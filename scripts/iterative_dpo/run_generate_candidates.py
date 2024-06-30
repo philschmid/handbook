@@ -84,7 +84,7 @@ def vllm_create_candidates(
     sampling_params = SamplingParams(
         max_tokens=max_new_tokens,
         n=num_samples,
-        temperature=kwargs.get("temperature", 0.7),
+        temperature=kwargs.get("temperature", 1.0),
         top_k=kwargs.get("top_k", -1),
         top_p=kwargs.get("top_p", 1),
     )

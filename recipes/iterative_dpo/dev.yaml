@@ -26,8 +26,8 @@ beta: 0.01
 eval_strategy: "no"
 gradient_accumulation_steps: 4
 gradient_checkpointing: true
-learning_rate: 5.0e-7
-lr_scheduler_type: cosine
+learning_rate: 0.0000005 # 5.0e-7
+lr_scheduler_type: constant
 warmup_ratio: 0.03 
 log_level: info
 logging_steps: 10

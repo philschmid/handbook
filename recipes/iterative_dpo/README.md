@@ -8,7 +8,7 @@ but in an online approach using `RLHFlow/ArmoRM-Llama3-8B-v0.1` as reward model.
 ## Slurm 
 
 ```bash
-sbatch --job-name=interative_dpo_test_3 --nodes=1 recipes/iterative_dpo/launch.slurm recipes/iterative_dpo/dev.yaml
+sbatch --job-name=interative_dpo_constant_lr --nodes=1 recipes/iterative_dpo/launch.slurm recipes/iterative_dpo/dev.yaml
 ```
 
 Grep margins: 
@@ -57,6 +57,21 @@ accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml 
 
 
 # Results full exp 2
+
+| Iteration/SFT                                                                                                     | Single Turn | Multi Turn | Mean | MixEval Hard |
+| ----------------------------------------------------------------------------------------------------------------- | ----------- | ---------- | ---- | ------------ |
+| SFT [alignment-handbook/zephyr-7b-sft-full](https://huggingface.co/alignment-handbook/zephyr-7b-sft-full)         | 6.7000      | 5.8375     | 6.27 | 28.25        |
+| Offline DPO [alignment-handbook/zephyr-7b-dpo-full](https://huggingface.co/alignment-handbook/zephyr-7b-dpo-full) | 7.5438      | 7.0625     | 7.30 | 34.85        |
+| Offline DPO trained (Global BS 128)                                                                               | 7.6125      | 7.20       | 7.41 | 32.65        |
+| Online DPO (Iteration 1)                                                                                          | 7.6813      | 6.4750     | 7.07 | 29.05        |
+| Online DPO (Iteration 2)                                                                                          | 6.6500      | 6.2875     | 6.46 | 27.45        |
+| Online DPO (Iteration 3)                                                                                          | 6.1063      | 5.2375     | 5.67 | 18.05        |
+
+
+
+# Results full exp 3 
+
+changes: constant lr which decreases by 0.75 per epoch: 5e-7,  
 
 | Iteration/SFT                                                                                                     | Single Turn | Multi Turn | Mean | MixEval Hard |
 | ----------------------------------------------------------------------------------------------------------------- | ----------- | ---------- | ---- | ------------ |

@@ -20,9 +20,11 @@ fi
 # Extract the num_iteration value from the config file
 num_iteration=$(awk -F: '/num_iteration/ {gsub(/ /, "", $2); print $2}' "$config")
 output_dir=$(awk -F: '/output_dir/ {gsub(/ /, "", $2); print $2}' "$config")
+initial_learning_rate=$(awk -F: '/learning_rate/ {gsub(/ /, "", $2); print $2}' "$config")
 num_gpus=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
 echo "Running $num_iteration iterations"
 echo "Output directory: $output_dir"
+echo "Initial Learning Rate: $initial_learning_rate"
 echo "Number of GPUs: $num_gpus"
 
 ###########################
@@ -83,12 +85,16 @@ for ((i=1; i<=num_iteration; i++)); do
     ########################
     # check if iteration > 1 and overwrite the config file model_name_or_path    
     if [ $i -eq 1 ]; then
-        model_name_or_path=$(grep -E '^model_name_or_path:.*$' $config  | sed -E 's/^model_name_or_path:[[:space:]]*//' | tr -d '"') 
+        model_name_or_path=$(grep -E '^model_name_or_path:.*$' $config  | sed -E 's/^model_name_or_path:[[:space:]]*//' | tr -d '"')
+        ref_model_name_or_path=$(grep -E '^model_name_or_path:.*$' $config  | sed -E 's/^model_name_or_path:[[:space:]]*//' | tr -d '"')
     else
         model_name_or_path=$output_dir/iteration_$(($i-1))
+        ref_model_name_or_path=$(grep -E '^model_name_or_path:.*$' $config  | sed -E 's/^model_name_or_path:[[:space:]]*//' | tr -d '"') 
     fi
+    learning_rate=$(echo "$initial_learning_rate * 0.5^($i-1)" | bc | sed -r 's/^(-?)\./\10./' )
+
     # DS3
-    ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml --num_processes $num_gpus scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
+    ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml --num_processes $num_gpus scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1 --learning_rate $learning_rate --ref_model_name_or_path $ref_model_name_or_path
     # ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/multi_gpu.yaml scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
     # python scripts/iterative_dpo/run_dpo.py --config $config --model_name_or_path $model_name_or_path --output_dir $output_dir/iteration_$i  --dataset_id_or_path $output_dir/iteration_$i/pairwise.json --num_train_epochs 1
     if [ $? -ne 0 ]; then

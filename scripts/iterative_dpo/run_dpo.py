@@ -27,11 +27,11 @@ from alignment import (
     decontaminate_humaneval,
     get_checkpoint,
     get_tokenizer,
+    DpoArguments,
 )
 from trl import (
     DPOTrainer,
     TrlParser,
-    DPOConfig,
     get_kbit_device_map,
     get_peft_config,
     get_quantization_config,
@@ -56,7 +56,7 @@ def merge_peft_model(adapter_dir, save_dir):
 
 
 def dpo_main(
-    model_args: ModelConfig, data_args: DataArguments, training_args: DPOConfig
+    model_args: ModelConfig, data_args: DataArguments, training_args: DpoArguments
 ):
     logger = setup_logging(training_args.get_process_log_level(), _logger)
 
@@ -129,8 +129,11 @@ def dpo_main(
     peft_config = get_peft_config(model_args)
     # Checks wether we use adapters for reference model or not
     if peft_config is None:
+        model_name_or_path = (
+            training_args.ref_model_name_or_path or model_args.model_name_or_path
+        )
         model_ref = AutoModelForCausalLM.from_pretrained(
-            model_args.model_name_or_path, **model_kwargs
+            model_name_or_path, **model_kwargs
         )
     else:
         model_ref = None
@@ -209,7 +212,9 @@ def dpo_main(
 
 
 def main():
-    parser = TrlParser((ModelConfig, DataArguments, DPOConfig), ignore_extra_args=True)
+    parser = TrlParser(
+        (ModelConfig, DataArguments, DpoArguments), ignore_extra_args=True
+    )
     model_args, data_args, training_args, _ = parser.parse_args_and_config()
     print(f"Model Args: {model_args}")
     print(f"Data Args: {data_args}")
