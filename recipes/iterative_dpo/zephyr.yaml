@@ -1,7 +1,7 @@
 num_iterations: 3
 output_dir: test/iterative_dpo
 # Model arguments
-model_name_or_path: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+model_name_or_path: alignment-handbook/zephyr-7b-sft-full
 torch_dtype: bfloat16
 attn_implementation: "flash_attention_2"
 

@@ -14,8 +14,14 @@ sbatch --job-name=interative_dpo_constant_lr --nodes=1 recipes/iterative_dpo/lau
 Grep margins: 
 
 ```bash
-grep -oP "'rewards/margins': \K[0-9.]*" /fsx/philipp/logs/offline_dpo_test_5-7206177.out
-``````
+grep -oP "'rewards/margins': \K[0-9.]*" /fsx/philipp/logs/interative_dpo_constant_lr-7291724.out
+```
+
+dev 
+```bash
+python scripts/iterative_dpo/run_iterative_dpo.py --config recipes/iterative_dpo/dev.yaml
+```
+
 
 
 ## Full training examples

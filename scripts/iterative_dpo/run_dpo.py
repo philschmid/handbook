@@ -24,7 +24,6 @@ from transformers import (
 from alignment import (
     DataArguments,
     apply_chat_template,
-    decontaminate_humaneval,
     get_checkpoint,
     get_tokenizer,
     DpoArguments,
@@ -184,7 +183,7 @@ def dpo_main(
         adapter_dir = os.path.join(training_args.output_dir, "adapter")
         trainer.model.save_pretrained(adapter_dir)
         logger.info(f"Adapters saved to {adapter_dir}")
-        logger.info(f"Merging adapter and base model...")
+        logger.info("Merging adapter and base model...")
         if trainer.accelerator.is_main_process:
             merge_peft_model(adapter_dir, training_args.output_dir)
         # merge adapter and base model

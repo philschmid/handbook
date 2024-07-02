@@ -1,7 +1,6 @@
-import torch
 from dataclasses import dataclass, field
 import os
-from datasets import load_dataset, Dataset, concatenate_datasets
+from datasets import load_dataset, concatenate_datasets
 from trl import TrlParser
 from alignment.data import create_pairwise_dpo_dataset
 

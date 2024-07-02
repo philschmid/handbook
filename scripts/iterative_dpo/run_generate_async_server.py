@@ -1,20 +1,58 @@
 import os
 import asyncio
+import logging
 import subprocess
 import time
 from typing import List, Dict
 import torch
 from openai import AsyncOpenAI
 from tqdm.asyncio import tqdm
-import logging
+from alignment.configs import CandidateArguments
+from peft import LoraConfig, AutoPeftModelForCausalLM
+from datasets import load_dataset
+from tqdm.auto import tqdm
+from trl import TrlParser
 
 logging.basicConfig(level=logging.INFO)
+
+# python scripts/iterative_dpo/run_generate_candidates.py \
+# --generation_model_name_or_path TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+# --dataset_path test/iterative_dpo/iteration_0/prompts.json
+# config file example
+# python scripts/iterative_dpo/run_generate_candidates.py --config recipes/iterative_dpo/dev.yaml
+
 
 debug = os.environ.get("DEBUG", False)
 if debug:
     devnull = None
 else:
     devnull = open(os.devnull, "wb")
+
+
+def validate_dataset(dataset):
+    """Validates the input dataset to be in the OAI messages format and that the last response is the assistant turn"""
+
+    def check_last_message(s):
+        if s["messages"][-1]["role"] != "assistant":
+            raise ValueError("Last message should be assistant message")
+
+    dataset = dataset.map(check_last_message)
+
+
+def is_peft_model(path):
+    if os.path.exists(path + "/adapter_config.json"):
+        config = LoraConfig.from_pretrained(path)
+        return config
+
+
+def merge_peft_model(path):
+    model = AutoPeftModelForCausalLM.from_pretrained(
+        path,
+        low_cpu_mem_usage=True,
+    )
+    logger.info("Merging adapter and base model...")
+    merged_model = model.merge_and_unload()  # merge adapter and base model
+    merged_model.save_pretrained(path, max_shard_size="3GB")
 
 
 class VllmAsync:
@@ -152,6 +190,22 @@ class VllmAsync:
 
 
 async def main():
+    parser = TrlParser((CandidateArguments), ignore_extra_args=True)
+    script_args = parser.parse_args_and_config()[0]
+    script_args = cast(CandidateArguments, script_args)
+
+    # load dataset and tokenizer
+    dataset = load_dataset("json", data_files=script_args.dataset_path, split="train")
+    # rename the message column to "messages"
+    if script_args.messages_column != "messages":
+        dataset = dataset.rename_column(script_args.messages_column, "messages")
+    # validate dataset format and that the last message is the assistant message
+    validate_dataset(dataset)
+    print(
+        f"Generating {script_args.num_samples} candidates for {len(dataset)} prompts..."
+    )
+
+    start_time = time.time()
     client = VllmAsync(
         model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
         data_parallel_size=1,
@@ -169,6 +223,12 @@ async def main():
             print("-" * 80)
     finally:
         await client.stop_servers()
+
+    print(
+        f"Generated {len(dataset) * script_args.num_samples} completions in {time.time() - start_time:.2f} seconds."
+    )
+    save_dir = os.path.dirname(script_args.dataset_path)
+    candidates_ds.to_json(os.path.join(save_dir, "candidates.json"))
 
 
 if __name__ == "__main__":

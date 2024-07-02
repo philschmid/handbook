@@ -1,7 +1,6 @@
 import logging
 import os
 import time
-from pathlib import Path
 from typing import Dict, List, cast
 
 import torch
@@ -10,15 +9,16 @@ from tqdm.auto import tqdm
 from trl import TrlParser
 from datasets import Dataset
 from alignment.configs import RankingArguments
-import torch
 from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# CUDA_VISIBLE_DEVICES=0 python scripts/iterative_dpo/run_rank_candidates.py \
+# python scripts/iterative_dpo/run_rank_candidates.py \
 # --rank_model_name_or_path RLHFlow/ArmoRM-Llama3-8B-v0.1 \
 # --rank_trust_remote_code True \
 # --dataset_path test/iterative_dpo/iteration_0/candidates.json
 # config file example
-# CUDA_VISIBLE_DEVICES=0 python scripts/iterative_dpo/run_rank_candidates.py --config recipes/iterative_dpo/dev.yaml
+
+logging.basicConfig(level=logging.INFO)
 
 
 class ArmoRMPipeline:
@@ -101,28 +101,16 @@ class RMPipeline:
         return {"score": output[0]["score"]}
 
 
-def rank_candidates_with_seq_model(
-    dataset: Dataset,
-    model_name_or_path: str,
-    trust_remote_code: bool = False,
-    **kwargs,
-):
-    # Load the model
-    rm_pipe = ArmoRMPipeline(model_name_or_path, trust_remote_code=trust_remote_code)
-    # Iterate over the dataset with batch size
-    ranked_completions = []
-    for s in tqdm(dataset, desc="Generating scores", total=len(dataset)):
-        # score the original message
-        original = {"messages": s["original"], "score": rm_pipe(s["original"])["score"]}
-        candidates = []
-        # iterate over the candidates and score them
-        for c in s["candidates"]:
-            res = rm_pipe(c)
-            candidates.append({"messages": c, "score": res["score"]})
-
-        ranked_completions.append({"original": original, "candidates": candidates})
-
-    return Dataset.from_list(ranked_completions)
+def rank_example(example, rm_pipe):
+    original = {
+        "messages": example["original"],
+        "score": rm_pipe(example["original"])["score"],
+    }
+    candidates = []
+    for c in example["candidates"]:
+        res = rm_pipe(c)
+        candidates.append({"messages": c, "score": res["score"]})
+    return {"original": original, "candidates": candidates}
 
 
 def main():
@@ -134,13 +122,39 @@ def main():
     # load dataset and tokenizer
     dataset = load_dataset("json", data_files=script_args.dataset_path, split="train")
 
-    # validate dataset format and that the last message is the assistant message
+    # Get number of available GPUs
+    num_gpus = torch.cuda.device_count()
+    logging.info(f"Number of available GPUs: {num_gpus}")
+
+    # Pre-load models
+    rm_pipes = []
+    for i in range(num_gpus):
+        rm_pipe = ArmoRMPipeline(
+            script_args.rank_model_name_or_path,
+            device_map={"": i},
+            trust_remote_code=script_args.rank_trust_remote_code,
+        )
+        rm_pipes.append(rm_pipe)
+
     start_time = time.time()
-    ranking_ds = rank_candidates_with_seq_model(
-        dataset,
-        model_name_or_path=script_args.rank_model_name_or_path,
-        trust_remote_code=script_args.rank_trust_remote_code,
-    )
+
+    ranked_completions = []
+    with ThreadPoolExecutor(max_workers=num_gpus) as executor:
+        futures = []
+
+        for i, example in enumerate(tqdm(dataset, desc="Scoring Examples")):
+            rm_pipe = rm_pipes[i % num_gpus]
+            future = executor.submit(rank_example, example, rm_pipe)
+            futures.append(future)
+
+            # collect after 50 results or at the end of the dataset
+            if len(futures) == 50 or i == len(dataset) - 1:
+                for completed_future in as_completed(futures):
+                    ranked_completions.append(completed_future.result())
+                futures = []
+
+    ranking_ds = Dataset.from_list(ranked_completions)
+
     logging.info(
         f"Ranking {len(ranking_ds)} took {time.time() - start_time:.2f} seconds."
     )

@@ -1,17 +1,13 @@
 import logging
 import os
 import time
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Sequence, cast
+from typing import cast
 
 import torch
 from datasets import load_dataset
 from tqdm.auto import tqdm
-from transformers import AutoTokenizer
 from trl import TrlParser
 from vllm import LLM, SamplingParams
-from vllm.lora.request import LoRARequest
 from datasets import Dataset
 from alignment.configs import CandidateArguments
 from peft import LoraConfig, AutoPeftModelForCausalLM

@@ -1,4 +1,3 @@
-import argparse
 from dataclasses import dataclass, field
 import os
 from datasets import load_dataset
@@ -49,7 +48,7 @@ def main():
     # shuffle and split into even sizes for iterations
     dataset = dataset.shuffle(seed=42)
     # Debug
-    dataset = dataset.select(range(30_000))
+    dataset = dataset.select(range(3_000))
 
     iteration_length = len(dataset) // script_args.num_iterations
     print(f"Total Dataset Size: {len(dataset)}")
