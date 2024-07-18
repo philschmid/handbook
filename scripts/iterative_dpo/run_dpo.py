@@ -120,7 +120,6 @@ def dpo_main(
         use_cache=False if training_args.gradient_checkpointing else True,
         device_map=None if quantization_config is None else get_kbit_device_map(),
         quantization_config=quantization_config,
-        low_cpu_mem_usage=True,
     )
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path, **model_kwargs

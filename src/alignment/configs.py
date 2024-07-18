@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, NewType, Optional, Tuple
 
 from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, TrainingArguments
-from trl import DPOConfig, ModelConfig
+from trl import DPOConfig, ModelConfig, SFTConfig
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -99,7 +99,7 @@ class DataArguments:
 
 
 @dataclass
-class SftArguments(TrainingArguments):
+class SftArguments(SFTConfig):
     """
     Arguments related to the training process itself. For all parameters, see: https://huggingface.co/docs/transformers/v4.26.1/en/main_classes/trainer#transformers.TrainingArguments
     Also used for the continued pretraining task.
@@ -107,6 +107,9 @@ class SftArguments(TrainingArguments):
 
     dataset_kwargs: Optional[Dict[str, Any]] = field(
         default=None, metadata={"help": "Dataset kwargs for the SFTTrainer"}
+    )
+    dataset_text_field: Optional[str] = field(
+        default="text", metadata={"help": "The text field in the dataset."}
     )
     max_seq_length: Optional[int] = field(
         default=None,

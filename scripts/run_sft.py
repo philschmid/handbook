@@ -26,6 +26,7 @@ from transformers import AutoModelForCausalLM, set_seed
 from alignment import (
     DataArguments,
     SftArguments,
+    ModelArguments,
     apply_chat_template,
     get_checkpoint,
     get_kbit_device_map,
@@ -53,7 +54,7 @@ def merge_peft_model(adapter_dir, save_dir):
 
 
 def sft_main(
-    model_args: ModelConfig, data_args: DataArguments, training_args: SftArguments
+    model_args: ModelArguments, data_args: DataArguments, training_args: SftArguments
 ):
 
     ###############
@@ -106,7 +107,7 @@ def sft_main(
     if training_args.distributed_state.is_main_process:
         for index in random.sample(range(len(train_dataset)), 2):
             logger.info(
-                f"Sample {index} of the processed training set:\n\n{train_dataset['train'][index]['text']}"
+                f"Sample {index} of the processed training set:\n\n{train_dataset[index]['text']}"
             )
     training_args.distributed_state.wait_for_everyone()  # wait for all processes to print
 
@@ -133,28 +134,24 @@ def sft_main(
         use_cache=False if training_args.gradient_checkpointing else True,
         device_map=None if quantization_config is None else get_kbit_device_map(),
         quantization_config=quantization_config,
-        low_cpu_mem_usage=True,
     )
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path, **model_kwargs
     )
+    peft_config = get_peft_config(model_args)
 
     ########################
     # Initialize the Trainer
     ########################
     trainer = SFTTrainer(
         model=model,
-        model_init_kwargs=model_kwargs,
         args=training_args,
         train_dataset=train_dataset,
-        dataset_text_field="text",
-        max_seq_length=training_args.max_seq_length,
         tokenizer=tokenizer,
-        packing=True,
-        peft_config=get_peft_config(model_args),
+        peft_config=peft_config,
         dataset_kwargs=training_args.dataset_kwargs,
     )
-    if trainer.accelerator.is_main_process:
+    if trainer.accelerator.is_main_process and peft_config:
         trainer.model.print_trainable_parameters()
 
     ###############
@@ -172,11 +169,11 @@ def sft_main(
     # Save model and create model card
     ##################################
     logger.info("*** Save model ***")
-    if trainer.is_fsdp_enabled:
+    if trainer.is_fsdp_enabled and peft_config:
         trainer.accelerator.state.fsdp_plugin.set_state_dict_type("FULL_STATE_DICT")
     # Restore k,v cache for fast inference
     trainer.model.config.use_cache = True
-    if model_args.merge_adapter:
+    if model_args.merge_adapter and peft_config:
         adapter_dir = os.path.join(training_args.output_dir, "adapter")
         trainer.model.save_pretrained(adapter_dir)
         logger.info(f"Adapters saved to {adapter_dir}")
@@ -208,8 +205,8 @@ def sft_main(
 
 
 def main():
-    parser = TrlParser((ModelConfig, DataArguments, SftArguments))
-    model_args, data_args, training_args, _ = parser.parse_args_and_config()
+    parser = TrlParser((ModelArguments, DataArguments, SftArguments))
+    model_args, data_args, training_args = parser.parse_args_and_config()
 
     # Set seed for reproducibility
     set_seed(training_args.seed)
