@@ -5,6 +5,12 @@ See below for commands to train these models using either DeepSpeed ZeRO-3 or FS
 
 ## Single-GPU
 
+### QLoRA training examples (WIP)
+
+```bash
+python scripts/run_sft.py --config recipes/sft/config_qlora.yaml
+```
+
 ## Multi-GPU
 
 ### Full training examples
@@ -12,6 +18,7 @@ See below for commands to train these models using either DeepSpeed ZeRO-3 or FS
 You will require 8 GPUs (80GB of VRAM) to train the full model.
 ```shell
 accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml --num_processes=4 scripts/run_sft.py --config recipes/sft/config_full.yaml
+accelerate launch --config_file recipes/accelerate_configs/fsdp.yaml --num_processes=4 scripts/run_sft.py --config recipes/sft/config_full.yaml
 ```
 
 ### Slurm 
