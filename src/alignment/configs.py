@@ -405,6 +405,14 @@ class CandidateArguments:
         default=1,
         metadata={"help": "Batch size for generation."},
     )
+    data_parallel_size: int = field(
+        default=1,
+        metadata={"help": "Data parallel size for generation."},
+    )
+    tensor_parallel_size: int = field(
+        default=1,
+        metadata={"help": "Tensor parallel size for generation."},
+    )
     max_new_tokens: int = field(
         default=2048,
         metadata={"help": "Maximum number of new tokens to generate."},

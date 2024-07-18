@@ -111,7 +111,7 @@ def main():
         )
 
     # Prepare the dataset if not done already
-    if state.last_completed_step is None:
+    if state.last_completed_step is None and state.current_iteration == 1:
         print("Preparing dataset")
         run_command(
             f"python scripts/iterative_dpo/run_prepare_dataset.py --config {args.config}",
@@ -130,7 +130,7 @@ def main():
                 generation_model_name_or_path = f"{output_dir}/iteration_{i-1}"
 
             run_command(
-                f"python scripts/iterative_dpo/run_generate_candidates.py --config recipes/iterative_dpo/dev.yaml --generation_model_name_or_path {generation_model_name_or_path} --dataset_path {output_dir}/iteration_{i}/prompts.json",
+                f"python scripts/iterative_dpo/run_generate_async_candidates.py --config recipes/iterative_dpo/dev.yaml --generation_model_name_or_path {generation_model_name_or_path} --dataset_path {output_dir}/iteration_{i}/prompts.json --data_parallel_size {num_gpus}",
                 state,
                 Step.GENERATE_CANDIDATES,
             )

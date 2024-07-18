@@ -3,23 +3,24 @@ import asyncio
 import logging
 import subprocess
 import time
-from typing import List, Dict
+from typing import List, Dict, cast
 import torch
 from openai import AsyncOpenAI
 from tqdm.asyncio import tqdm
 from alignment.configs import CandidateArguments
 from peft import LoraConfig, AutoPeftModelForCausalLM
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 from tqdm.auto import tqdm
 from trl import TrlParser
 
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# python scripts/iterative_dpo/run_generate_candidates.py \
+# python scripts/iterative_dpo/run_generate_async_server.py \
 # --generation_model_name_or_path TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
 # --dataset_path test/iterative_dpo/iteration_0/prompts.json
 # config file example
-# python scripts/iterative_dpo/run_generate_candidates.py --config recipes/iterative_dpo/dev.yaml
+# python scripts/iterative_dpo/run_generate_async_server.py --config recipes/iterative_dpo/dev.yaml
 
 
 debug = os.environ.get("DEBUG", False)
@@ -62,7 +63,7 @@ class VllmAsync:
         data_parallel_size: int,
         tensor_parallel_size: int,
         max_num_seqs: int = 200,
-        max_concurrent_requests: int = 16,
+        max_concurrent_requests: int = 32,
     ):
         self.model_id = model_id
         self.data_parallel_size = data_parallel_size
@@ -133,7 +134,7 @@ class VllmAsync:
             i = 0
             if i == 60:  # 10 minutes
                 raise RuntimeError("Servers did not start in time")
-            logging.info("Waiting for servers to start...")
+            print("Waiting for servers to start...")
             tasks = [client.models.list() for client in self.clients]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -156,6 +157,7 @@ class VllmAsync:
         max_new_tokens: int = 1024,
         temperature: float = 1.0,
         top_p: float = 1.0,
+        num_samples: int = 2,
     ):
         if not self.clients:
             raise RuntimeError("Servers not started. Call start_servers() first.")
@@ -163,17 +165,22 @@ class VllmAsync:
         async def _generate(messages: str):
             async with self.semaphore:
                 client = self.clients[hash(messages[0]["content"]) % len(self.clients)]
-                response = await client.chat.completions.create(
-                    model=self.model_id,
-                    messages=messages,
-                    max_tokens=max_new_tokens,
-                    temperature=temperature,
-                    top_p=top_p,
-                )
-                return {
-                    "role": "assistant",
-                    "content": response.choices[0].message.content,
-                }
+                try:
+                    response = await client.chat.completions.create(
+                        model=self.model_id,
+                        messages=messages,
+                        max_tokens=max_new_tokens,
+                        temperature=temperature,
+                        top_p=top_p,
+                        n=num_samples,
+                    )
+                    return [
+                        {"role": "assistant", "content": choice.message.content}
+                        for choice in response.choices
+                    ]
+                except Exception as e:
+                    logging.error(f"Error generating response: {e}")
+                    return []
 
         tasks = [asyncio.create_task(_generate(m)) for m in messages]
         results = []
@@ -204,31 +211,44 @@ async def main():
     print(
         f"Generating {script_args.num_samples} candidates for {len(dataset)} prompts..."
     )
+    # create prompt messages
+    dataset = dataset.map(lambda s: {"prompts": s["messages"][:-1]})
+    print(dataset.features.keys())
+    print("First prompt:", dataset["prompts"][0])
 
     start_time = time.time()
     client = VllmAsync(
-        model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        data_parallel_size=1,
-        tensor_parallel_size=1,
+        model_id=script_args.generation_model_name_or_path,
+        data_parallel_size=script_args.data_parallel_size,
+        tensor_parallel_size=script_args.tensor_parallel_size,
     )
     await client.start_servers()
 
-    prompts = [[{"role": "user", "content": "What is the capital of France?"}]] * 128
-
     try:
-        results = await client.generate(prompts)
-        for prompt, result in zip(prompts, results):
-            print(f"Prompt: {prompt[0]['content']}")
-            print(f"Response: {result['content']}")
-            print("-" * 80)
+        results = await client.generate(
+            dataset["prompts"], num_samples=script_args.num_samples
+        )
+        completions = []
+        for original, result in zip(dataset, results):
+
+            candidate = {"original": original["messages"], "candidates": []}
+            if len(result) == 0:
+                continue
+            for cand in result:
+                _candidate = original["messages"][:-1]
+                _candidate.append(cand)
+                candidate["candidates"].append(_candidate)
+            completions.append(candidate)
+        candidates_ds = Dataset.from_list(completions)
+
+        print(
+            f"Generated {len(dataset) * script_args.num_samples} completions in {time.time() - start_time:.2f} seconds."
+        )
+        save_dir = os.path.dirname(script_args.dataset_path)
+        candidates_ds.to_json(os.path.join(save_dir, "candidates.json"))
+
     finally:
         await client.stop_servers()
-
-    print(
-        f"Generated {len(dataset) * script_args.num_samples} completions in {time.time() - start_time:.2f} seconds."
-    )
-    save_dir = os.path.dirname(script_args.dataset_path)
-    candidates_ds.to_json(os.path.join(save_dir, "candidates.json"))
 
 
 if __name__ == "__main__":
