@@ -3,9 +3,8 @@ __version__ = "0.3.0.dev0"
 from .configs import (
     DataArguments,
     DpoArguments,
-    H4ArgumentParser,
+    SftArguments,
     ModelArguments,
-    SFTConfig,
 )
 from .data import apply_chat_template, get_datasets
 from .decontaminate import decontaminate_humaneval
