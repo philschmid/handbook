@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --ntasks-per-node=1
 #SBATCH --exclusive
-#SBATCH --gres=gpu:8
+#SBATCH --gres=gpu:2
 #SBATCH --partition=hopper-prod  # Adjust this for your cluster
 #SBATCH --output=/fsx/h4/logs/%x-%j.out # Adjust this for your cluster
 #SBATCH --err=/fsx/h4/logs/%x-%j.err    # Adjust this for your cluster
@@ -9,7 +9,7 @@
 set -x -e
 
 source ~/.bashrc
-conda activate handbook
+micromamba activate dev
 echo "START TIME: $(date)"
 
 MODEL=$1

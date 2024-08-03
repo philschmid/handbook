@@ -69,6 +69,9 @@ _deps = [
     "trl>=0.8.2",
     "jinja2>=3.0.0",
     "tqdm>=4.64.1",
+    # iterative dpo
+    "vllm"
+    # flash-attn
 ]
 
 # this is a lookup table with items like:
@@ -114,6 +117,7 @@ install_requires = [
     deps["tqdm"],  # progress bars in model download and training scripts
     deps["transformers"],
     deps["trl"],
+    deps["vllm"],
 ]
 
 setup(

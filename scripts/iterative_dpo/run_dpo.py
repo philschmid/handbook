@@ -13,32 +13,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-Supervised fine-tuning script for decoder language models.
-"""
-
 import logging
-import random
 import os
 import torch
-from transformers import AutoModelForCausalLM, set_seed
+from transformers import (
+    AutoModelForCausalLM,
+    set_seed,
+)
 
 from alignment import (
     DataArguments,
-    SftArguments,
-    ModelArguments,
     apply_chat_template,
     get_checkpoint,
+    get_tokenizer,
+    DpoArguments,
+)
+from trl import (
+    DPOTrainer,
+    TrlParser,
     get_kbit_device_map,
     get_peft_config,
     get_quantization_config,
-    get_tokenizer,
+    ModelConfig,
 )
-from trl import SFTTrainer, TrlParser, ModelConfig
-from alignment.utils import setup_logging
+
 from datasets import load_dataset
 from peft import AutoPeftModelForCausalLM
-
+from alignment.utils import setup_logging
 
 _logger = logging.getLogger(__name__)
 
@@ -53,21 +54,13 @@ def merge_peft_model(adapter_dir, save_dir):
     merged_model.save_pretrained(save_dir, max_shard_size="3GB")
 
 
-def sft_main(
-    model_args: ModelArguments, data_args: DataArguments, training_args: SftArguments
+def dpo_main(
+    model_args: ModelConfig, data_args: DataArguments, training_args: DpoArguments
 ):
-
-    ###############
-    # Setup logging
-    ###############
     logger = setup_logging(training_args.get_process_log_level(), _logger)
-    # Log on each process a small summary
-    logger.warning(
-        f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
-        + f" distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
-    )
+
+    # Log on each process the small summary:
     logger.info(f"Model parameters {model_args}")
-    logger.info(f"Data parameters {data_args}")
     logger.info(f"Training/evaluation parameters {training_args}")
 
     ###############
@@ -82,9 +75,9 @@ def sft_main(
             data_args.dataset_id_or_path, split=data_args.dataset_splits
         )
 
-    ################
-    # Load tokenizer
-    ################
+    #####################################
+    # Load tokenizer and process datasets
+    #####################################
     tokenizer = get_tokenizer(model_args, data_args)
 
     #####################
@@ -94,30 +87,23 @@ def sft_main(
         apply_chat_template,
         fn_kwargs={
             "tokenizer": tokenizer,
-            "task": "sft",
+            "task": "dpo",
             "auto_insert_empty_system_msg": True,
         },
         desc="Formatting comparisons with prompt template",
     )
     # remove all columns except chosen, rejected
-    logger.info(f"Columns: {train_dataset.features.keys()}")
-    train_dataset = train_dataset.select_columns(["text"])
+    print(f"Columns: {train_dataset.features.keys()}")
+    train_dataset = train_dataset.select_columns(["prompt", "chosen", "rejected"])
 
-    # print random sample on rank 0
-    if training_args.distributed_state.is_main_process:
-        for index in random.sample(range(len(train_dataset)), 2):
-            logger.info(
-                f"Sample {index} of the processed training set:\n\n{train_dataset[index]['text']}"
-            )
-    training_args.distributed_state.wait_for_everyone()  # wait for all processes to print
-
-    #######################
-    # Load pretrained model
-    #######################
-    # Check for last checkpoint
+    # Check for last checkpoint for continuing training
     last_checkpoint = get_checkpoint(training_args)
     if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
         logger.info(f"Checkpoint detected, resuming training at {last_checkpoint=}.")
+
+    #######################################
+    # Load the model and/or reference model
+    #######################################
 
     torch_dtype = (
         model_args.torch_dtype
@@ -138,42 +124,62 @@ def sft_main(
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path, **model_kwargs
     )
-    peft_config = get_peft_config(model_args)
 
-    ########################
-    # Initialize the Trainer
-    ########################
-    trainer = SFTTrainer(
-        model=model,
+    peft_config = get_peft_config(model_args)
+    # Checks wether we use adapters for reference model or not
+    if peft_config is None:
+        model_name_or_path = (
+            training_args.ref_model_name_or_path or model_args.model_name_or_path
+        )
+        model_ref = AutoModelForCausalLM.from_pretrained(
+            model_name_or_path, **model_kwargs
+        )
+    else:
+        model_ref = None
+
+    #########################
+    # Instantiate DPO trainer
+    #########################
+    trainer = DPOTrainer(
+        model,
+        ref_model=model_ref,
         args=training_args,
         train_dataset=train_dataset,
         tokenizer=tokenizer,
+        max_length=training_args.max_length,
+        max_prompt_length=training_args.max_prompt_length,
         peft_config=peft_config,
-        dataset_kwargs=training_args.dataset_kwargs,
+        loss_type=training_args.loss_type,
     )
-    if trainer.accelerator.is_main_process and peft_config:
-        trainer.model.print_trainable_parameters()
 
     ###############
     # Training loop
     ###############
-    logger.info("*** Train ***")
-    train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+    # Train the model
+    train_result = trainer.train(resume_from_checkpoint=checkpoint)
+    # Log and save metrics
     metrics = train_result.metrics
     metrics["train_samples"] = len(train_dataset)
     trainer.log_metrics("train", metrics)
     trainer.save_metrics("train", metrics)
     trainer.save_state()
 
+    logger.info("*** Training complete ***")
+
     ##################################
     # Save model and create model card
     ##################################
     logger.info("*** Save model ***")
-    if trainer.is_fsdp_enabled and peft_config:
+    if trainer.is_fsdp_enabled:
         trainer.accelerator.state.fsdp_plugin.set_state_dict_type("FULL_STATE_DICT")
     # Restore k,v cache for fast inference
     trainer.model.config.use_cache = True
-    if model_args.merge_adapter and peft_config:
+    if model_args.use_peft:
         adapter_dir = os.path.join(training_args.output_dir, "adapter")
         trainer.model.save_pretrained(adapter_dir)
         logger.info(f"Adapters saved to {adapter_dir}")
@@ -205,14 +211,19 @@ def sft_main(
 
 
 def main():
-    parser = TrlParser((ModelArguments, DataArguments, SftArguments))
-    model_args, data_args, training_args = parser.parse_args_and_config()
+    parser = TrlParser(
+        (ModelConfig, DataArguments, DpoArguments), ignore_extra_args=True
+    )
+    model_args, data_args, training_args, _ = parser.parse_args_and_config()
+    print(f"Model Args: {model_args}")
+    print(f"Data Args: {data_args}")
+    print(f"Training Args: {training_args}")
 
     # Set seed for reproducibility
     set_seed(training_args.seed)
 
     # Run the main training loop
-    sft_main(model_args, data_args, training_args)
+    dpo_main(model_args, data_args, training_args)
 
 
 if __name__ == "__main__":

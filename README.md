@@ -127,3 +127,8 @@ If you find the content of this repo useful in your work, please cite it as foll
   howpublished = {\url{https://github.com/huggingface/alignment-handbook}}
 }
 ```
+
+
+# TODOS:
+
+* [ ] https://github.com/fe1ixxu/CPO_SIMPO/tree/main/training_configs
